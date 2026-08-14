@@ -26,6 +26,11 @@ DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 
 CHAT_DB = "ChatStorage.sqlite"
 CONTACTS_DB = "ContactsV2.sqlite"
+# Maps phone numbers to the @lid privacy identifiers used in group messages,
+# which is the only way to reach a name for someone not in the address book.
+LID_DB = "LID.sqlite"
+
+SNAPSHOT_DBS = (CHAT_DB, CONTACTS_DB, LID_DB)
 
 
 class SnapshotMissing(RuntimeError):
@@ -48,9 +53,11 @@ def snapshot(dest: Path | None = None) -> Path:
             "Is WhatsApp for Mac installed and linked to your account?"
         )
 
-    for name in (CHAT_DB, CONTACTS_DB):
+    for name in SNAPSHOT_DBS:
         stem = Path(name).stem
-        for suffix in ("", "-wal", "-shm"):
+        # Copy the database and its write-ahead log, but never the -shm: it is a
+        # rebuildable index into the WAL, and a stale one can block recovery.
+        for suffix in ("", "-wal"):
             src = CONTAINER / f"{stem}.sqlite{suffix}"
             if src.exists():
                 target = dest / f"{stem}.sqlite{suffix}"
@@ -58,6 +65,7 @@ def snapshot(dest: Path | None = None) -> Path:
                 if target.exists():
                     target.chmod(0o600)
                 shutil.copy2(src, target)
+        (dest / f"{stem}.sqlite-shm").unlink(missing_ok=True)
 
         copied = dest / f"{stem}.sqlite"
         if not copied.exists():
@@ -93,6 +101,15 @@ def connect(data_dir: Path | None = None) -> sqlite3.Connection:
         conn.execute(
             "CREATE TABLE contacts.ZWAADDRESSBOOKCONTACT "
             "(ZFULLNAME TEXT, ZLID TEXT, ZWHATSAPPID TEXT)"
+        )
+
+    lid = data_dir / LID_DB
+    if lid.exists():
+        conn.execute("ATTACH DATABASE ? AS lid", (f"file:{lid}?mode=ro",))
+    else:
+        conn.execute("ATTACH DATABASE ':memory:' AS lid")
+        conn.execute(
+            "CREATE TABLE lid.ZWAZACCOUNT (ZPHONENUMBER TEXT, ZIDENTIFIER TEXT)"
         )
     return conn
 
