@@ -1,0 +1,991 @@
+<title>WhatsApp Reader Architecture</title>
+
+<style>
+  :root {
+    --ground:    #F2F5F4;
+    --surface:   #FFFFFF;
+    --surface-2: #E9EEEC;
+    --ink:       #131C1B;
+    --ink-soft:  #3D4C4A;
+    --muted:     #5F6E6C;
+    --hairline:  #D6DEDB;
+    --accent:    #0B6B63;
+    --accent-sf: #E0EFEC;
+    --danger:    #A33A26;
+    --danger-sf: #F6E7E2;
+    --warn:      #8A6212;
+
+    --serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --sans:  ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    --mono:  ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+
+    --measure: 68ch;
+    --wide: 1020px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:    #0D1413;
+      --surface:   #141D1C;
+      --surface-2: #1B2625;
+      --ink:       #E5EBE9;
+      --ink-soft:  #C2CECB;
+      --muted:     #8B9A97;
+      --hairline:  #263433;
+      --accent:    #58CFBE;
+      --accent-sf: #12302C;
+      --danger:    #E0836A;
+      --danger-sf: #33211C;
+      --warn:      #D6A84A;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:    #0D1413;
+    --surface:   #141D1C;
+    --surface-2: #1B2625;
+    --ink:       #E5EBE9;
+    --ink-soft:  #C2CECB;
+    --muted:     #8B9A97;
+    --hairline:  #263433;
+    --accent:    #58CFBE;
+    --accent-sf: #12302C;
+    --danger:    #E0836A;
+    --danger-sf: #33211C;
+    --warn:      #D6A84A;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: var(--wide);
+    margin: 0 auto;
+    padding: 0 24px 120px;
+  }
+
+  .col { max-width: var(--measure); }
+
+  /* ---------- masthead ---------- */
+
+  header.masthead {
+    padding: 88px 0 40px;
+    border-bottom: 1px solid var(--hairline);
+    margin-bottom: 56px;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 20px;
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(2.5rem, 6vw, 3.9rem);
+    line-height: 1.04;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+    margin: 0 0 24px;
+  }
+
+  .standfirst {
+    font-family: var(--serif);
+    font-size: clamp(1.15rem, 2.2vw, 1.4rem);
+    line-height: 1.5;
+    color: var(--ink-soft);
+    margin: 0;
+    max-width: 60ch;
+  }
+
+  .decisions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 36px;
+  }
+
+  .chip {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    padding: 6px 12px;
+    border: 1px solid var(--hairline);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--ink-soft);
+  }
+
+  .chip b { color: var(--accent); font-weight: 600; }
+
+  /* ---------- sections ---------- */
+
+  section { margin-bottom: 76px; }
+
+  h2 {
+    font-family: var(--serif);
+    font-size: clamp(1.7rem, 3.4vw, 2.2rem);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    line-height: 1.15;
+    text-wrap: balance;
+    margin: 0 0 8px;
+  }
+
+  h3 {
+    font-family: var(--sans);
+    font-size: 1.02rem;
+    font-weight: 650;
+    letter-spacing: -0.005em;
+    margin: 36px 0 10px;
+  }
+
+  .sec-label {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  p { margin: 0 0 18px; max-width: var(--measure); }
+
+  a { color: var(--accent); text-underline-offset: 3px; }
+  a:focus-visible,
+  summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.87em;
+    background: var(--surface-2);
+    padding: 0.12em 0.4em;
+    border-radius: 4px;
+  }
+
+  strong { font-weight: 650; }
+
+  ul { max-width: var(--measure); padding-left: 1.15rem; margin: 0 0 18px; }
+  li { margin-bottom: 9px; }
+
+  /* ---------- callouts ---------- */
+
+  .note {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-sf);
+    padding: 16px 20px;
+    margin: 26px 0;
+    max-width: var(--measure);
+    border-radius: 0 6px 6px 0;
+  }
+  .note p:last-child { margin-bottom: 0; }
+  .note .tag {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 7px;
+  }
+
+  .note.caution { border-left-color: var(--danger); background: var(--danger-sf); }
+  .note.caution .tag { color: var(--danger); }
+
+  /* ---------- figures ---------- */
+
+  figure {
+    margin: 40px 0;
+    padding: 28px 24px 20px;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+    overflow-x: auto;
+  }
+
+  figure svg {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    min-width: 520px;
+    color: var(--ink-soft);
+  }
+
+  figcaption {
+    font-size: 14.5px;
+    line-height: 1.55;
+    color: var(--muted);
+    margin-top: 20px;
+    padding-top: 14px;
+    border-top: 1px solid var(--hairline);
+    max-width: 76ch;
+  }
+
+  /* SVG primitives */
+  .d-box    { fill: var(--surface-2); stroke: var(--hairline); stroke-width: 1.5; }
+  .d-box-a  { fill: var(--accent-sf); stroke: var(--accent); stroke-width: 1.5; }
+  .d-box-d  { fill: var(--danger-sf); stroke: var(--danger); stroke-width: 1.5; stroke-dasharray: 5 4; }
+  .d-line   { stroke: currentColor; stroke-width: 1.6; fill: none; }
+  .d-line-a { stroke: var(--accent); stroke-width: 2; fill: none; }
+  .d-line-d { stroke: var(--danger); stroke-width: 2; fill: none; stroke-dasharray: 6 4; }
+  .d-rule   { stroke: var(--muted); stroke-width: 1.4; stroke-dasharray: 3 5; fill: none; }
+  .d-t      { fill: var(--ink); font-family: var(--sans); font-size: 13px; }
+  .d-t-sm   { fill: var(--muted); font-family: var(--mono); font-size: 11px; }
+  .d-t-a    { fill: var(--accent); font-family: var(--mono); font-size: 11px; }
+  .d-t-d    { fill: var(--danger); font-family: var(--mono); font-size: 11px; }
+  .d-mono   { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+  .d-head   { fill: currentColor; }
+  .d-head-a { fill: var(--accent); }
+  .d-head-d { fill: var(--danger); }
+
+  /* ---------- tables ---------- */
+
+  .table-wrap { overflow-x: auto; margin: 26px 0; }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 560px;
+    font-size: 15px;
+  }
+
+  th {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+    padding: 0 16px 10px 0;
+    border-bottom: 1px solid var(--hairline);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 12px 16px 12px 0;
+    border-bottom: 1px solid var(--hairline);
+    vertical-align: top;
+    line-height: 1.5;
+  }
+
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td code { background: none; padding: 0; color: var(--ink); }
+  tr:last-child td { border-bottom: none; }
+
+  .yes { color: var(--accent); font-weight: 600; }
+  .no  { color: var(--danger); font-weight: 600; }
+
+  /* ---------- file tree ---------- */
+
+  .tree {
+    font-family: var(--mono);
+    font-size: 13.5px;
+    line-height: 1.85;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+    padding: 24px 26px;
+    overflow-x: auto;
+    margin: 26px 0;
+    white-space: pre;
+    color: var(--ink-soft);
+  }
+  .tree .c { color: var(--muted); }
+  .tree .f { color: var(--ink); }
+  .tree .n { color: var(--accent); }
+
+  /* ---------- steps ---------- */
+
+  ol.steps { counter-reset: s; list-style: none; padding: 0; margin: 26px 0; max-width: var(--measure); }
+  ol.steps li {
+    counter-increment: s;
+    position: relative;
+    padding-left: 46px;
+    margin-bottom: 18px;
+  }
+  ol.steps li::before {
+    content: counter(s, decimal-leading-zero);
+    position: absolute;
+    left: 0;
+    top: 1px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    border: 1px solid var(--hairline);
+    background: var(--surface);
+    border-radius: 5px;
+    padding: 2px 7px;
+  }
+
+  footer {
+    border-top: 1px solid var(--hairline);
+    padding-top: 26px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    a { transition: opacity 120ms ease; }
+  }
+  @media (max-width: 640px) {
+    body { font-size: 16px; }
+    header.masthead { padding-top: 56px; }
+    figure { padding: 20px 14px 14px; }
+  }
+</style>
+
+<div class="page">
+
+<header class="masthead">
+  <p class="eyebrow">Architecture proposal · Node 24 · August 2026</p>
+  <h1>Reading WhatsApp without touching WhatsApp</h1>
+  <p class="standfirst">
+    A TypeScript MCP server that answers questions about 165,000 messages by
+    reading a SQLite file that is already on the disk — and never opens a socket
+    to do it.
+  </p>
+  <div class="decisions">
+    <span class="chip"><b>Port</b> &nbsp;Python retired</span>
+    <span class="chip"><b>SDK</b> &nbsp;@modelcontextprotocol/server 2.0</span>
+    <span class="chip"><b>Tools</b> &nbsp;8</span>
+    <span class="chip"><b>Build step</b> &nbsp;none</span>
+    <span class="chip"><b>Native deps</b> &nbsp;none</span>
+  </div>
+</header>
+
+<!-- ============================================================ -->
+<section>
+  <p class="sec-label">Why this shape</p>
+  <h2>The constraint that decides everything</h2>
+
+  <div class="col">
+    <p>
+      The obvious way to connect an assistant to WhatsApp is a <code>whatsmeow</code>
+      or Baileys bridge that pairs as a linked device. It works, and it is also how
+      accounts get warned and banned — <a href="https://github.com/tulir/whatsmeow/issues/810">whatsmeow#810</a>
+      collects reports of the <em>"account may be using unauthorized tools"</em> banner
+      appearing for users doing zero bulk sending, with some accounts banned outright at
+      low volume. The issue is closed as <em>not planned</em>, because the detection is
+      server-side and no library can patch it.
+    </p>
+    <p>
+      WhatsApp for Mac is Meta's own first-party client. It is already linked, already
+      syncing, and already maintains a complete local store. Reading that file involves
+      no client, no pairing, and no network — so the ban question does not apply at all.
+    </p>
+    <p>
+      Everything below follows from that one decision. It is also why there is no
+      <code>send_message</code> tool and never will be: sending is the half that would
+      reintroduce the risk this design exists to avoid.
+    </p>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 800 400" role="img" aria-label="Comparison: the rejected whatsmeow bridge crosses the network boundary to Meta and gets banned, while the reader stays entirely on the Mac, reading only the file that WhatsApp for Mac writes.">
+      <defs>
+        <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon class="d-head" points="0,1 10,5 0,9" />
+        </marker>
+        <marker id="a1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon class="d-head-a" points="0,1 10,5 0,9" />
+        </marker>
+        <marker id="a1d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon class="d-head-d" points="0,1 10,5 0,9" />
+        </marker>
+      </defs>
+
+      <!-- boundary -->
+      <line class="d-rule" x1="546" y1="24" x2="546" y2="384" />
+      <text class="d-t-sm" x="554" y="36">network boundary</text>
+
+      <!-- Meta -->
+      <rect class="d-box" x="626" y="176" width="150" height="54" rx="7" />
+      <text class="d-t" x="701" y="200" text-anchor="middle">Meta servers</text>
+      <text class="d-t-sm" x="701" y="218" text-anchor="middle">no message content</text>
+
+      <!-- rejected path -->
+      <text class="d-t-d" x="264" y="48">REJECTED</text>
+      <rect class="d-box-d" x="264" y="58" width="196" height="54" rx="7" />
+      <text class="d-t" x="362" y="82" text-anchor="middle">whatsmeow bridge</text>
+      <text class="d-t-sm" x="362" y="100" text-anchor="middle">pairs as linked device</text>
+
+      <path class="d-line-d" d="M460 88 L626 180" marker-end="url(#a1d)" />
+      <text class="d-t-d" x="474" y="126">unofficial client</text>
+      <text class="d-t-d" x="474" y="142">→ account banned</text>
+
+      <!-- chosen path -->
+      <rect class="d-box" x="24" y="176" width="176" height="54" rx="7" />
+      <text class="d-t" x="112" y="200" text-anchor="middle">WhatsApp for Mac</text>
+      <text class="d-t-sm" x="112" y="218" text-anchor="middle">first-party client</text>
+
+      <line class="d-line" x1="200" y1="203" x2="266" y2="203" marker-end="url(#a1)" />
+      <text class="d-t-sm" x="233" y="194" text-anchor="middle">writes</text>
+
+      <rect class="d-box" x="266" y="176" width="194" height="54" rx="7" />
+      <text class="d-mono" x="363" y="199" text-anchor="middle">ChatStorage.sqlite</text>
+      <text class="d-t-sm" x="363" y="217" text-anchor="middle">168 MB · 165k messages</text>
+
+      <rect class="d-box-a" x="266" y="300" width="194" height="54" rx="7" />
+      <text class="d-t" x="363" y="324" text-anchor="middle">whatsapp-reader</text>
+      <text class="d-t-sm" x="363" y="342" text-anchor="middle">MCP server</text>
+
+      <line class="d-line-a" x1="363" y1="300" x2="363" y2="236" marker-end="url(#a1a)" />
+      <text class="d-t-a" x="374" y="272">reads, read-only</text>
+
+      <!-- first-party sync routed under -->
+      <path class="d-line" d="M112 230 L112 380 L701 380 L701 236" marker-end="url(#a1)" />
+      <text class="d-t-sm" x="330" y="372">first-party sync keeps the file current</text>
+    </svg>
+    <figcaption>
+      Both paths reach the same data. Only one crosses the network boundary under its own
+      identity. The reader sits below the file it reads and has no edge leaving the Mac —
+      which is the entire safety argument, drawn.
+    </figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================ -->
+<section>
+  <p class="sec-label">Runtime</p>
+  <h2>Verified, not assumed</h2>
+
+  <div class="col">
+    <p>
+      Every capability below was checked on this machine against the real 168&nbsp;MB
+      store before being designed around. The Python MCP SDK had already moved to a
+      different API than expected this week, so nothing here is taken on memory.
+    </p>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Check</th><th>Result</th><th>Consequence for the design</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>node</code></td>
+          <td class="num">v24.11.1</td>
+          <td>Modern baseline available; pin <code>engines.node &gt;= 24</code>.</td>
+        </tr>
+        <tr>
+          <td><code>node:sqlite</code> present</td>
+          <td class="yes">yes</td>
+          <td>No <code>better-sqlite3</code>, no node-gyp, no prebuild matrix.</td>
+        </tr>
+        <tr>
+          <td><code>readOnly: true</code> enforced</td>
+          <td class="yes">yes</td>
+          <td>Write attempt rejected at the driver. Read-only is real, not a convention.</td>
+        </tr>
+        <tr>
+          <td>Dual <code>ATTACH</code></td>
+          <td class="yes">yes</td>
+          <td>Contacts and LID join in one query; no cross-database plumbing.</td>
+        </tr>
+        <tr>
+          <td>Hebrew round-trip</td>
+          <td class="yes">yes</td>
+          <td>Chat titles and message bodies survive intact.</td>
+        </tr>
+        <tr>
+          <td><code>'unixepoch','localtime'</code></td>
+          <td class="yes">yes</td>
+          <td>Core Data timestamps convert in SQL; no date library needed.</td>
+        </tr>
+        <tr>
+          <td><code>process.features.typescript</code></td>
+          <td class="num"><code>'strip'</code></td>
+          <td><strong>No build step.</strong> <code>.ts</code> runs directly.</td>
+        </tr>
+        <tr>
+          <td><code>node:test</code> / <code>node:assert</code></td>
+          <td class="yes">built in</td>
+          <td>No Jest, no Vitest.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <span class="tag">What this buys</span>
+    <p>
+      Two runtime dependencies total, both pure JavaScript. The whole server is
+      <code>git clone</code> then <code>npm i</code> — no compiler, no Python
+      interpreter, no virtualenv to activate before Claude Code can start it.
+    </p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section>
+  <p class="sec-label">Libraries</p>
+  <h2>What we depend on, and what we refused</h2>
+
+  <h3>Runtime dependencies</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Package</th><th>Version</th><th>Role</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>@modelcontextprotocol/server</code></td>
+          <td class="num">2.0.0</td>
+          <td><code>McpServer</code> and <code>StdioServerTransport</code>. Published 2026-07-28 — the same v2 generation as the Python SDK already proven in this project.</td>
+        </tr>
+        <tr>
+          <td><code>zod</code></td>
+          <td class="num">^4.2.0</td>
+          <td>Tool input schemas. Pulled in by the SDK anyway; v2 accepts any Standard Schema library, and Zod is the documented default.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Built into Node — deliberately not packages</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Built-in</th><th>Replaces</th><th>Why it matters here</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>node:sqlite</code></td>
+          <td><code>better-sqlite3</code></td>
+          <td>Native module means node-gyp, a toolchain, and a rebuild on every Node upgrade. The built-in has none of that and passed every capability check.</td>
+        </tr>
+        <tr>
+          <td>type stripping</td>
+          <td><code>tsx</code>, <code>esbuild</code>, <code>tsc</code> build</td>
+          <td>Node 24 executes <code>.ts</code> directly. <code>tsc</code> stays as a dev-time typecheck only, never in the run path.</td>
+        </tr>
+        <tr>
+          <td><code>node:test</code></td>
+          <td>Jest / Vitest</td>
+          <td>The test suite is fixture-driven and assertion-heavy; no mocking framework earns its weight.</td>
+        </tr>
+        <tr>
+          <td><code>node:fs</code>, <code>node:path</code></td>
+          <td><code>fs-extra</code>, <code>globby</code></td>
+          <td>Snapshotting copies four known filenames. Nothing to glob.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Dev dependencies</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Package</th><th>Role</th></tr></thead>
+      <tbody>
+        <tr><td><code>typescript</code></td><td><code>tsc --noEmit</code> typecheck with <code>erasableSyntaxOnly</code>.</td></tr>
+        <tr><td><code>@types/node</code></td><td>Types for <code>node:sqlite</code> and friends.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note caution">
+    <span class="tag">Risk, and the exit</span>
+    <p>
+      <code>@modelcontextprotocol/server@2.0.0</code> is two weeks old. Step one of the
+      work order is a throwaway spike: boot a one-tool stdio server and confirm Claude
+      Code connects. If it misbehaves, <code>@modelcontextprotocol/sdk@1.30.0</code> is
+      the same architecture with an older API shape. Checking before porting any query
+      logic keeps that fallback cheap.
+    </p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section>
+  <p class="sec-label">Mechanism</p>
+  <h2>Why we copy the database instead of reading it</h2>
+
+  <div class="col">
+    <p>
+      This looks like a convenience and is actually a correctness requirement.
+      WhatsApp's store runs in WAL mode. A read-only SQLite connection to a WAL database
+      still needs to create the <code>-shm</code> shared-memory index; against WhatsApp's
+      container that fails with <code>SQLITE_READONLY_CANTINIT</code> unless you pass
+      <code>immutable=1</code>, which risks torn reads while WhatsApp is actively writing.
+    </p>
+    <p>
+      So: copy, checkpoint, then open the copy read-only. WhatsApp keeps writing
+      throughout and never sees a lock.
+    </p>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 800 330" role="img" aria-label="The snapshot pipeline: the live database and its write-ahead log are copied but never the shared-memory file, the log is checkpointed into the main file, and the result is opened read-only.">
+      <defs>
+        <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon class="d-head" points="0,1 10,5 0,9" />
+        </marker>
+        <marker id="a2a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon class="d-head-a" points="0,1 10,5 0,9" />
+        </marker>
+      </defs>
+
+      <text class="d-t-sm" x="16" y="20">WHATSAPP CONTAINER · LIVE</text>
+      <rect class="d-box" x="16" y="34" width="188" height="40" rx="6" />
+      <text class="d-mono" x="110" y="59" text-anchor="middle">ChatStorage.sqlite</text>
+
+      <rect class="d-box" x="16" y="86" width="188" height="40" rx="6" />
+      <text class="d-mono" x="110" y="111" text-anchor="middle">.sqlite-wal</text>
+
+      <rect class="d-box-d" x="16" y="138" width="188" height="40" rx="6" />
+      <text class="d-mono" x="110" y="163" text-anchor="middle">.sqlite-shm</text>
+
+      <text class="d-t-sm" x="16" y="200">WhatsApp writing continuously</text>
+
+      <!-- copy arrows -->
+      <line class="d-line" x1="204" y1="54" x2="300" y2="54" marker-end="url(#a2)" />
+      <line class="d-line" x1="204" y1="106" x2="300" y2="106" marker-end="url(#a2)" />
+      <line class="d-line-d" x1="204" y1="158" x2="286" y2="158" />
+      <line class="d-line-d" x1="278" y1="150" x2="294" y2="166" />
+      <line class="d-line-d" x1="294" y1="150" x2="278" y2="166" />
+      <text class="d-t-d" x="212" y="184">never copied</text>
+
+      <text class="d-t-sm" x="240" y="42" text-anchor="middle">copy</text>
+
+      <!-- snapshot -->
+      <text class="d-t-sm" x="304" y="20">./data · SNAPSHOT</text>
+      <rect class="d-box" x="304" y="34" width="170" height="40" rx="6" />
+      <text class="d-mono" x="389" y="59" text-anchor="middle">.sqlite</text>
+      <rect class="d-box" x="304" y="86" width="170" height="40" rx="6" />
+      <text class="d-mono" x="389" y="111" text-anchor="middle">-wal</text>
+
+      <path class="d-line" d="M474 106 C 506 106, 506 66, 528 60" marker-end="url(#a2)" />
+      <line class="d-line" x1="474" y1="54" x2="528" y2="54" marker-end="url(#a2)" />
+      <text class="d-t-sm" x="482" y="140">wal_checkpoint(TRUNCATE)</text>
+
+      <!-- folded -->
+      <rect class="d-box-a" x="530" y="34" width="176" height="66" rx="6" />
+      <text class="d-mono" x="618" y="60" text-anchor="middle">ChatStorage.sqlite</text>
+      <text class="d-t-sm" x="618" y="80" text-anchor="middle">folded · chmod 0400</text>
+
+      <line class="d-line-a" x1="618" y1="100" x2="618" y2="164" marker-end="url(#a2a)" />
+      <text class="d-t-a" x="628" y="136">open read-only</text>
+
+      <rect class="d-box-a" x="530" y="166" width="176" height="46" rx="6" />
+      <text class="d-t" x="618" y="194" text-anchor="middle">queries run here</text>
+
+      <!-- attached -->
+      <line class="d-line" x1="618" y1="212" x2="618" y2="248" marker-end="url(#a2)" />
+      <text class="d-t-sm" x="628" y="234">ATTACH</text>
+      <rect class="d-box" x="452" y="250" width="108" height="40" rx="6" />
+      <text class="d-mono" x="506" y="275" text-anchor="middle">ContactsV2</text>
+      <rect class="d-box" x="572" y="250" width="108" height="40" rx="6" />
+      <text class="d-mono" x="626" y="275" text-anchor="middle">LID</text>
+      <line class="d-line" x1="600" y1="248" x2="530" y2="250" />
+    </svg>
+    <figcaption>
+      The <code>-shm</code> is the one file that must <em>not</em> travel. It is a
+      rebuildable index into the log, and a stale copy blocks WAL recovery — which
+      presents as a database whose tables all read as empty. That failure cost real
+      debugging time on the LID store this week; the fix is encoded in the pipeline.
+    </figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================ -->
+<section>
+  <p class="sec-label">Structure</p>
+  <h2>Two adapters, one set of queries</h2>
+
+  <div class="col">
+    <p>
+      The layering exists to make one class of bug impossible. Query functions are pure,
+      take a database handle, and know nothing about MCP. The CLI and the MCP server are
+      both thin adapters over exactly those functions — so <code>wa search</code> and the
+      <code>search_messages</code> tool cannot drift apart, because there is only one
+      implementation to drift.
+    </p>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 800 320" role="img" aria-label="Layering: Claude Code speaks JSON-RPC over stdio to the server, which validates with Zod and calls query functions; the CLI calls the same query functions directly. Both reach node:sqlite and three attached databases.">
+      <defs>
+        <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon class="d-head" points="0,1 10,5 0,9" />
+        </marker>
+        <marker id="a3a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon class="d-head-a" points="0,1 10,5 0,9" />
+        </marker>
+      </defs>
+
+      <!-- entries -->
+      <rect class="d-box-a" x="40" y="20" width="180" height="46" rx="7" />
+      <text class="d-t" x="130" y="48" text-anchor="middle">Claude Code</text>
+
+      <rect class="d-box" x="560" y="20" width="180" height="46" rx="7" />
+      <text class="d-t" x="650" y="48" text-anchor="middle">you, in a terminal</text>
+
+      <line class="d-line-a" x1="130" y1="66" x2="130" y2="106" marker-end="url(#a3a)" />
+      <text class="d-t-a" x="140" y="92">JSON-RPC / stdio</text>
+
+      <line class="d-line" x1="650" y1="66" x2="650" y2="106" marker-end="url(#a3)" />
+
+      <!-- adapters -->
+      <rect class="d-box" x="40" y="108" width="180" height="52" rx="7" />
+      <text class="d-mono" x="130" y="132" text-anchor="middle">server.ts</text>
+      <text class="d-t-sm" x="130" y="150" text-anchor="middle">McpServer + tools.ts</text>
+
+      <rect class="d-box" x="560" y="108" width="180" height="52" rx="7" />
+      <text class="d-mono" x="650" y="132" text-anchor="middle">cli.ts</text>
+      <text class="d-t-sm" x="650" y="150" text-anchor="middle">argument parsing</text>
+
+      <text class="d-t-sm" x="252" y="128">zod validates</text>
+      <text class="d-t-sm" x="252" y="144">tool input</text>
+
+      <!-- shared core -->
+      <line class="d-line" x1="130" y1="160" x2="130" y2="186" />
+      <line class="d-line" x1="650" y1="160" x2="650" y2="186" />
+      <path class="d-line" d="M130 186 L130 194 L650 194 L650 186" />
+      <line class="d-line" x1="390" y1="194" x2="390" y2="212" marker-end="url(#a3)" />
+
+      <rect class="d-box-a" x="200" y="214" width="380" height="52" rx="7" />
+      <text class="d-mono" x="390" y="238" text-anchor="middle">queries/ — pure functions over a handle</text>
+      <text class="d-t-sm" x="390" y="256" text-anchor="middle">chats · messages · stats · people · summary · media</text>
+
+      <line class="d-line" x1="390" y1="266" x2="390" y2="288" marker-end="url(#a3)" />
+      <text class="d-t-sm" x="400" y="282">node:sqlite</text>
+
+      <rect class="d-box" x="200" y="290" width="118" height="26" rx="5" />
+      <text class="d-t-sm" x="259" y="307" text-anchor="middle">ChatStorage</text>
+      <rect class="d-box" x="331" y="290" width="118" height="26" rx="5" />
+      <text class="d-t-sm" x="390" y="307" text-anchor="middle">ContactsV2</text>
+      <rect class="d-box" x="462" y="290" width="118" height="26" rx="5" />
+      <text class="d-t-sm" x="521" y="307" text-anchor="middle">LID</text>
+    </svg>
+    <figcaption>
+      The join before <code>queries/</code> is the point of the drawing: every path into
+      the data passes through the same functions, so there is no second implementation
+      to keep in sync.
+    </figcaption>
+  </figure>
+
+  <div class="tree"><span class="c">whatsapp-reader/</span>
+├── package.json          <span class="c">type: module · bin: { wa }</span>
+├── tsconfig.json         <span class="c">noEmit + erasableSyntaxOnly</span>
+├── src/
+│   ├── <span class="f">schema.ts</span>          <span class="c">Core Data constants, SQL fragments</span>
+│   ├── <span class="f">db.ts</span>              <span class="c">snapshot() + openSnapshot()</span>
+│   ├── queries/
+│   │   ├── <span class="f">chats.ts</span>       <span class="c">listChats, resolveChat</span>
+│   │   ├── <span class="f">messages.ts</span>    <span class="c">readChat, searchMessages</span>
+│   │   ├── <span class="f">stats.ts</span>       <span class="c">stats</span>
+│   │   ├── <span class="n">people.ts</span>      <span class="c">resolvePhone            new</span>
+│   │   ├── <span class="n">summary.ts</span>     <span class="c">daySummary              new</span>
+│   │   └── <span class="n">media.ts</span>       <span class="c">exportMedia             new</span>
+│   ├── <span class="f">tools.ts</span>           <span class="c">zod schemas + registerTool</span>
+│   ├── <span class="f">server.ts</span>          <span class="c">MCP entry point</span>
+│   └── <span class="f">cli.ts</span>             <span class="c">human entry point</span>
+└── test/
+    ├── <span class="f">fixture.ts</span>         <span class="c">synthetic store, reproduces both traps</span>
+    ├── <span class="f">queries.test.ts</span>
+    └── <span class="f">offline.test.ts</span>    <span class="c">no-network guarantees</span></div>
+</section>
+
+<!-- ============================================================ -->
+<section>
+  <p class="sec-label">The hard part</p>
+  <h2>Sender names, and the two columns that lie</h2>
+
+  <div class="col">
+    <p>
+      No single column holds a sender's display name, and the two that look like they do
+      are both traps. This chain took real debugging to get right, so it ports across
+      verbatim — comments included.
+    </p>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 800 340" role="img" aria-label="Sender resolution fallback chain with six steps, and two dead-end columns that appear correct but are not: ZCONTACTNAME which is empty on every row, and ZPUSHNAME which holds base64 protobuf.">
+      <defs>
+        <marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon class="d-head" points="0,1 10,5 0,9" />
+        </marker>
+        <marker id="a4a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon class="d-head-a" points="0,1 10,5 0,9" />
+        </marker>
+      </defs>
+
+      <rect class="d-box" x="16" y="140" width="120" height="46" rx="7" />
+      <text class="d-t" x="76" y="162" text-anchor="middle">a message</text>
+      <text class="d-t-sm" x="76" y="178" text-anchor="middle">row</text>
+
+      <line class="d-line" x1="136" y1="163" x2="176" y2="163" marker-end="url(#a4)" />
+
+      <!-- chain -->
+      <rect class="d-box-a" x="178" y="30" width="200" height="42" rx="6" />
+      <text class="d-t-sm" x="188" y="47">1 · ZISFROMME = 1</text>
+      <text class="d-mono" x="188" y="64">→ "Me"</text>
+
+      <rect class="d-box-a" x="178" y="80" width="200" height="42" rx="6" />
+      <text class="d-t-sm" x="188" y="97">2 · group → @lid → ZLID</text>
+      <text class="d-mono" x="188" y="114">→ address book name</text>
+
+      <rect class="d-box-a" x="178" y="130" width="200" height="42" rx="6" />
+      <text class="d-t-sm" x="188" y="147">3 · ZFROMJID → ZWHATSAPPID</text>
+      <text class="d-mono" x="188" y="164">→ address book name</text>
+
+      <rect class="d-box-a" x="178" y="180" width="200" height="42" rx="6" />
+      <text class="d-t-sm" x="188" y="197">4 · pushname by @lid</text>
+      <text class="d-mono" x="188" y="214">→ self-set name</text>
+
+      <rect class="d-box-a" x="178" y="230" width="200" height="42" rx="6" />
+      <text class="d-t-sm" x="188" y="247">5 · pushname by JID</text>
+      <text class="d-mono" x="188" y="264">→ self-set name</text>
+
+      <rect class="d-box" x="178" y="280" width="200" height="42" rx="6" />
+      <text class="d-t-sm" x="188" y="297">6 · fallback</text>
+      <text class="d-mono" x="188" y="314">→ raw identifier</text>
+
+      <path class="d-line" d="M176 163 L176 51 L178 51" marker-end="url(#a4)" />
+      <path class="d-line" d="M176 163 L176 101 L178 101" marker-end="url(#a4)" />
+      <path class="d-line" d="M176 163 L178 163" marker-end="url(#a4)" />
+      <path class="d-line" d="M176 163 L176 201 L178 201" marker-end="url(#a4)" />
+      <path class="d-line" d="M176 163 L176 251 L178 251" marker-end="url(#a4)" />
+      <path class="d-line" d="M176 163 L176 301 L178 301" marker-end="url(#a4)" />
+
+      <line class="d-line-a" x1="378" y1="176" x2="424" y2="176" marker-end="url(#a4a)" />
+      <rect class="d-box-a" x="426" y="150" width="150" height="52" rx="7" />
+      <text class="d-t" x="501" y="174" text-anchor="middle">sender name</text>
+      <text class="d-t-sm" x="501" y="192" text-anchor="middle">63% real names</text>
+
+      <!-- traps -->
+      <text class="d-t-d" x="606" y="46">LOOKS RIGHT, IS NOT</text>
+
+      <rect class="d-box-d" x="606" y="58" width="180" height="58" rx="7" />
+      <text class="d-mono" x="616" y="80">ZCONTACTNAME</text>
+      <text class="d-t-sm" x="616" y="98">empty string on all</text>
+      <text class="d-t-sm" x="616" y="112">16,777 rows</text>
+
+      <rect class="d-box-d" x="606" y="128" width="180" height="58" rx="7" />
+      <text class="d-mono" x="616" y="150">ZPUSHNAME</text>
+      <text class="d-t-sm" x="616" y="168">base64 protobuf,</text>
+      <text class="d-t-sm" x="616" y="182">not a name</text>
+
+      <text class="d-t-d" x="606" y="216">A plain COALESCE picks the</text>
+      <text class="d-t-d" x="606" y="232">empty string and every</text>
+      <text class="d-t-d" x="606" y="248">sender renders blank.</text>
+      <text class="d-t-d" x="606" y="264">NULLIF is load-bearing.</text>
+    </svg>
+    <figcaption>
+      Steps 2 and 3 carry most of the traffic; steps 4 and 5 recover people who were
+      never saved as contacts. The 37% that fall through to step 6 are strangers in large
+      neighbourhood groups, for whom no local source of a name exists at all.
+    </figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================ -->
+<section>
+  <p class="sec-label">Surface</p>
+  <h2>Eight tools</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Tool</th><th>Status</th><th>What it does</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>list_chats</code></td><td>port</td><td>Chats by recency, filterable by name and kind.</td></tr>
+        <tr><td><code>read_chat</code></td><td>port</td><td>Messages from one chat, resolved senders, date-windowed. Ambiguous names return candidates rather than guessing.</td></tr>
+        <tr><td><code>search_messages</code></td><td>port</td><td>Text search across all chats, scoped by chat, sender, or date.</td></tr>
+        <tr><td><code>stats</code></td><td>port</td><td>Totals, date range, breakdown by year and message type.</td></tr>
+        <tr><td><code>refresh_snapshot</code></td><td>port</td><td>Re-copy the live store. The only non-read tool, and it writes only to <code>./data</code>.</td></tr>
+        <tr><td><code>resolve_phone</code></td><td class="yes">new</td><td>Number → name via <code>ZWAZACCOUNT</code> (9,896 rows) joined to address book and pushnames. Hit 96% on a real 161-number set.</td></tr>
+        <tr><td><code>day_summary</code></td><td class="yes">new</td><td>Timezone-correct "who did I exchange messages with on date X", separating chats you replied in from chats that were merely active.</td></tr>
+        <tr><td><code>export_media</code></td><td class="yes">new</td><td>Resolve <code>ZMEDIALOCALPATH</code> to real files and copy them out, so images can actually be opened.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note caution">
+    <span class="tag">Timezone is a correctness bug, not a nicety</span>
+    <p>
+      Timestamps are Core Data seconds from 2001-01-01. Rendering them as UTC silently
+      drops evening messages when you ask "who did I message today" from UTC+3 — this
+      bit us in practice. All date handling goes through one helper in
+      <code>schema.ts</code>, with a test that pins the boundary.
+    </p>
+  </div>
+
+  <div class="col">
+    <h3>Security posture, carried across unchanged</h3>
+    <ul>
+      <li>Every read tool annotated <code>readOnlyHint</code>; <code>refresh_snapshot</code> marked non-destructive and idempotent.</li>
+      <li>Server instructions tell the model that message text is third-party data and never instructions — messages are attacker-controllable even without a send tool.</li>
+      <li>No send capability at any point.</li>
+      <li><code>data/</code> gitignored; the snapshot is a full plaintext message history and the repo stays private.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section>
+  <p class="sec-label">Execution</p>
+  <h2>Work order</h2>
+
+  <ol class="steps">
+    <li><strong>Spike the SDK first.</strong> Install <code>@modelcontextprotocol/server@2.0.0</code>, boot a one-tool stdio server, confirm Claude Code connects. Decide v2 versus v1 before any query logic exists, so the fallback stays cheap.</li>
+    <li><strong>Scaffold</strong> <code>package.json</code> and <code>tsconfig.json</code> with <code>erasableSyntaxOnly</code>.</li>
+    <li><strong>Port <code>schema.ts</code> and <code>db.ts</code></strong>, then assert snapshot parity against Python — identical row counts across all three databases.</li>
+    <li><strong>Port the fixture, then the queries</strong> module by module with tests. The fixture reproduces both schema traps on purpose; keep that.</li>
+    <li><strong>Add the three new query modules</strong> — people, summary, media.</li>
+    <li><strong>Wire <code>tools.ts</code>, <code>server.ts</code>, <code>cli.ts</code></strong>.</li>
+    <li><strong>Repoint <code>.mcp.json</code></strong> and verify in a fresh session.</li>
+    <li><strong>Delete the Python</strong> — <code>src/whatsapp_reader/</code>, <code>pyproject.toml</code>, <code>tests/*.py</code> — and rewrite the README.</li>
+  </ol>
+</section>
+
+<!-- ============================================================ -->
+<section>
+  <p class="sec-label">Acceptance</p>
+  <h2>How we know it works</h2>
+
+  <div class="col">
+    <p>
+      The last check is the strongest one available, because it has ground truth:
+      today's phone-resolution run produced a known-good result against 161 real numbers,
+      including two spreadsheet errors it caught. The port has to reproduce it exactly.
+    </p>
+    <ul>
+      <li><code>node --test</code> green, including every sender-resolution branch and both trap regressions.</li>
+      <li><code>tsc --noEmit</code> clean.</li>
+      <li><code>wa snapshot &amp;&amp; wa stats</code> → 165k+ messages, newest timestamp within the minute.</li>
+      <li><code>wa read "The bronshteins"</code> → real names, Hebrew intact.</li>
+      <li>All 8 tools callable from a fresh Claude Code session, returning structured results.</li>
+      <li>Offline guarantees hold: no network-capable imports, no WhatsApp endpoints, query path exercised with sockets stubbed.</li>
+      <li><strong>Regression:</strong> <code>resolve_phone</code> over the 161 building numbers reproduces 156/161, including <code>[redacted]</code> → דירה 37 and <code>[redacted]</code> → דירה 35.</li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  <p>
+    Architecture proposal for <code>avivbr/whatsapp-reader</code>. Runtime facts verified
+    on macOS with Node v24.11.1 against a live 168&nbsp;MB store, 14 August 2026.
+  </p>
+</footer>
+
+</div>
