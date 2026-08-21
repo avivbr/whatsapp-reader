@@ -2,10 +2,10 @@
   "mcpServers": {
     "whatsapp": {
       "type": "stdio",
-      "command": "/Users/avivbronshtein/projects/whatsapp-reader/.venv/bin/python",
+      "command": "node",
       "args": [
-        "-m",
-        "whatsapp_reader.mcp_server"
+        "--no-warnings",
+        "/Users/avivbronshtein/projects/whatsapp-reader/src/server.ts"
       ],
       "env": {}
     }
