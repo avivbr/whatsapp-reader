@@ -76,7 +76,7 @@ describe("offline guarantees", () => {
       const dir = buildStore();
       const db = openSnapshot(dir);
       try {
-        assert.equal(stats(db).messages, 7);
+        assert.equal(stats(db).messages, 11);
         assert.ok(readChat(db, "Family").messages.length > 0);
         assert.equal(searchMessages(db, "hello").length, 1);
         assert.equal(resolvePhone(db, "972500000111").bestName, "Ada Lovelace");

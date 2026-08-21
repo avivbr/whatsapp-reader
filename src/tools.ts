@@ -12,7 +12,7 @@ import * as z from "zod";
 
 import { DATA_DIR, openSnapshot, snapshot, snapshotAgeSeconds } from "./db.ts";
 import { listChats } from "./queries/chats.ts";
-import { exportMedia } from "./queries/media.ts";
+import { exportMedia, findMedia } from "./queries/media.ts";
 import { readChat, searchMessages } from "./queries/messages.ts";
 import { resolvePhones } from "./queries/people.ts";
 import { stats } from "./queries/stats.ts";
@@ -164,25 +164,62 @@ export function registerTools(server: McpServer): void {
     async ({ date }) => json(withDb((db) => ({ ...daySummary(db, date), ...freshness() }))),
   );
 
+  const MEDIA_KINDS = z
+    .array(z.enum(["image", "video", "voice", "document", "sticker"]))
+    .optional()
+    .describe("restrict to these attachment kinds");
+
+  server.registerTool(
+    "find_media",
+    {
+      description:
+        "List attachments without copying them: kind, MIME type, size, caption, sender, and whether the file is on disk. Documents also carry their original filename.",
+      inputSchema: z.object({
+        kinds: MEDIA_KINDS,
+        chat: z.string().optional(),
+        sender: z.string().optional(),
+        since: DATE.optional(),
+        until: DATE.optional(),
+        onDiskOnly: z.boolean().default(false).describe("skip attachments never downloaded"),
+        limit: z.number().int().min(1).max(500).default(100),
+      }),
+      annotations: READ_ONLY,
+    },
+    async ({ kinds, chat, sender, since, until, onDiskOnly, limit }) =>
+      json(
+        withDb((db) =>
+          guardChat(() => ({
+            media: findMedia(db, { kinds, chat, sender, since, until, onDiskOnly, limit }),
+            ...freshness(),
+          })),
+        ),
+      ),
+  );
+
   server.registerTool(
     "export_media",
     {
       description:
-        "Copy a chat's downloaded attachments to a directory so they can be opened. Attachments that were never downloaded are reported as missing.",
+        "Copy downloaded attachments to a directory so they can be opened. Documents keep their original filename. Attachments never downloaded are reported as missing.",
       inputSchema: z.object({
-        chat: z.string(),
         destination: z.string().optional().describe("defaults to a temp directory"),
+        chat: z.string().optional().describe("all chats when omitted"),
+        kinds: MEDIA_KINDS,
+        sender: z.string().optional(),
         since: DATE.optional(),
         until: DATE.optional(),
         limit: z.number().int().min(1).max(1000).default(200),
       }),
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
-    async ({ chat, destination, since, until, limit }) =>
+    async ({ destination, chat, kinds, sender, since, until, limit }) =>
       json(
         withDb((db) =>
           guardChat(() =>
-            exportMedia(db, chat, destination ?? join(tmpdir(), "whatsapp-export"), {
+            exportMedia(db, destination ?? join(tmpdir(), "whatsapp-export"), {
+              chat,
+              kinds,
+              sender,
               since,
               until,
               limit,

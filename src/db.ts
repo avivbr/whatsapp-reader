@@ -120,9 +120,14 @@ export function snapshotAgeSeconds(dataDir: string = DATA_DIR): number | null {
   return (Date.now() - statSync(chat).mtimeMs) / 1000;
 }
 
-/** Resolve a ZMEDIALOCALPATH to an absolute path, if the file was downloaded. */
-export function mediaPath(relative: string): string | null {
+/**
+ * Resolve a ZMEDIALOCALPATH to an absolute path, if the file was downloaded.
+ *
+ * `root` defaults to WhatsApp's own media directory and exists so tests can
+ * point at a synthetic tree instead.
+ */
+export function mediaPath(relative: string, root: string = MEDIA_ROOT): string | null {
   if (!relative) return null;
-  const candidate = join(MEDIA_ROOT, relative);
+  const candidate = join(root, relative);
   return existsSync(candidate) ? candidate : null;
 }

@@ -7,9 +7,9 @@
  * fixture without them would let the blank-sender bug back in unnoticed.
  */
 
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 import { CHAT_DB, CONTACTS_DB, LID_DB } from "../src/db.ts";
@@ -42,7 +42,10 @@ export function buildStore(): string {
       Z_PK INTEGER PRIMARY KEY, ZMEMBERJID TEXT, ZCONTACTNAME TEXT DEFAULT ''
     );
     CREATE TABLE ZWAPROFILEPUSHNAME (ZJID TEXT, ZPUSHNAME TEXT);
-    CREATE TABLE ZWAMEDIAITEM (Z_PK INTEGER PRIMARY KEY, ZMEDIALOCALPATH TEXT);
+    CREATE TABLE ZWAMEDIAITEM (
+      Z_PK INTEGER PRIMARY KEY, ZMEDIALOCALPATH TEXT, ZAUTHORNAME TEXT,
+      ZVCARDSTRING TEXT, ZFILESIZE INTEGER, ZTITLE TEXT
+    );
   `);
 
   const session = chat.prepare(
@@ -61,9 +64,19 @@ export function buildStore(): string {
   push.run("222@lid", "Yossi");
   push.run("972500000999@s.whatsapp.net", "Direct Pushname");
 
-  chat
-    .prepare("INSERT INTO ZWAMEDIAITEM (Z_PK, ZMEDIALOCALPATH) VALUES (?,?)")
-    .run(1, "Media/1/a/pic.jpg");
+  // ZAUTHORNAME is the original filename (documents only), ZVCARDSTRING the MIME
+  // type, ZTITLE the sender's caption. All three are misleadingly named.
+  const media = chat.prepare(
+    `INSERT INTO ZWAMEDIAITEM
+       (Z_PK, ZMEDIALOCALPATH, ZAUTHORNAME, ZVCARDSTRING, ZFILESIZE, ZTITLE)
+     VALUES (?,?,?,?,?,?)`,
+  );
+  media.run(1, "Media/1/a/pic.jpg", null, "image/jpeg", 2048, "at the beach");
+  media.run(2, "Media/1/b/doc.pdf", "מסמך חשוב.pdf", "application/pdf", 51200, null);
+  media.run(3, "Media/1/c/clip.mp4", null, "video/mp4", 1048576, null);
+  media.run(4, "Media/1/d/note.opus", null, "audio/ogg; codecs=opus", 8192, null);
+  // Indexed but never downloaded: the row exists, the file does not.
+  media.run(5, "Media/1/e/never.jpg", null, "image/jpeg", 4096, null);
 
   const msg = chat.prepare(`
     INSERT INTO ZWAMESSAGE
@@ -85,6 +98,11 @@ export function buildStore(): string {
   msg.run(6, 0, 1, 10, 1, cd("2026-06-10"), "grp@g.us", null, 1, JUNK);
   // a second chat whose name shares a prefix with the first
   msg.run(7, 0, 3, 10, null, cd("2026-07-10"), "grp2@g.us", "reunion planning", 0, JUNK);
+  // a document, a video, a voice note, and an attachment that was never fetched
+  msg.run(8, 0, 1, 10, 2, cd("2026-06-11"), "grp@g.us", null, 8, JUNK);
+  msg.run(9, 1, 1, null, 3, cd("2026-06-12"), null, null, 2, null);
+  msg.run(10, 0, 1, 11, 4, cd("2026-06-13"), "grp@g.us", null, 3, JUNK);
+  msg.run(11, 0, 1, 12, 5, cd("2026-06-14"), "grp@g.us", null, 1, JUNK);
   chat.close();
 
   const contacts = new DatabaseSync(join(dir, CONTACTS_DB));
@@ -110,4 +128,25 @@ export function buildStore(): string {
   lid.close();
 
   return dir;
+}
+
+/**
+ * Build a media tree matching the fixture's ZMEDIALOCALPATH values.
+ *
+ * Deliberately omits Media/1/e/never.jpg so the "indexed but not downloaded"
+ * path is exercised rather than assumed.
+ */
+export function buildMediaRoot(): string {
+  const root = mkdtempSync(join(tmpdir(), "wa-media-"));
+  for (const [path, bytes] of [
+    ["Media/1/a/pic.jpg", "jpeg-bytes"],
+    ["Media/1/b/doc.pdf", "%PDF-1.4 fake"],
+    ["Media/1/c/clip.mp4", "mp4-bytes"],
+    ["Media/1/d/note.opus", "opus-bytes"],
+  ] as const) {
+    const full = join(root, path);
+    mkdirSync(dirname(full), { recursive: true });
+    writeFileSync(full, bytes);
+  }
+  return root;
 }

@@ -7,7 +7,7 @@ import { join } from "node:path";
 
 import { DATA_DIR, SnapshotMissingError, openSnapshot, snapshot, snapshotAgeSeconds } from "./db.ts";
 import { listChats } from "./queries/chats.ts";
-import { exportMedia } from "./queries/media.ts";
+import { type MediaKind, exportMedia, findMedia } from "./queries/media.ts";
 import { readChat, searchMessages } from "./queries/messages.ts";
 import { resolvePhones } from "./queries/people.ts";
 import { stats } from "./queries/stats.ts";
@@ -24,8 +24,26 @@ Offline and read-only; never contacts WhatsApp.
   wa search <term> [--chat C] [--from S] [--since D] [--until D] [-n]
   wa whois <number>...             resolve phone numbers to names
   wa today [date]                  who you exchanged messages with
-  wa media <chat> [--out DIR] [--since D] [--until D]
+  wa media [chat] [--kind K] [--out DIR] [--since D] [--until D]
+  wa find-media [--kind K] [--chat C] [--from S] [--media] [-n]
+                                   list attachments without copying them
+
+  --kind accepts image, video, voice, document, sticker (comma-separated)
 `;
+
+const MEDIA_KINDS = ["image", "video", "voice", "document", "sticker"] as const;
+
+/** Parse a comma-separated --kind value, rejecting anything unrecognised. */
+function parseKinds(value: string | undefined): MediaKind[] | undefined {
+  if (!value) return undefined;
+  return value.split(",").map((raw) => {
+    const kind = raw.trim().toLowerCase();
+    if (!(MEDIA_KINDS as readonly string[]).includes(kind)) {
+      throw new Error(`unknown media kind "${kind}"; expected one of ${MEDIA_KINDS.join(", ")}`);
+    }
+    return kind as MediaKind;
+  });
+}
 
 const OPTIONS = {
   limit: { type: "string", short: "n" },
@@ -164,15 +182,36 @@ function main(argv: string[]): number {
         return 0;
       }
       case "media": {
-        if (!rest[0]) throw new Error("media needs a chat");
-        const r = exportMedia(db, rest[0], values.out ?? join(tmpdir(), "whatsapp-export"), {
+        const r = exportMedia(db, values.out ?? join(tmpdir(), "whatsapp-export"), {
+          chat: rest[0],
+          kinds: parseKinds(values.kind),
           since: values.since,
           until: values.until,
           limit: limit ?? 200,
         });
-        const done = r.exported.filter((e) => e.exported).length;
-        console.log(`${done} file(s) -> ${r.destination}`);
+        console.log(`${r.written} file(s) -> ${r.destination}`);
         if (r.missing > 0) console.log(`${r.missing} indexed but never downloaded`);
+        return 0;
+      }
+      case "find-media": {
+        const found = findMedia(db, {
+          chat: values.chat,
+          kinds: parseKinds(values.kind),
+          sender: values.from,
+          since: values.since,
+          until: values.until,
+          onDiskOnly: values.media,
+          limit: limit ?? 40,
+        });
+        for (const f of found) {
+          const size = f.sizeBytes ? `${Math.round(f.sizeBytes / 1024)}KB` : "-";
+          const label = f.filename ?? f.caption ?? f.source.split("/").pop() ?? "";
+          console.log(
+            `[${f.date}] ${f.onDisk ? " " : "!"} ${f.kind.padEnd(9)} ${size.padStart(7)}  ` +
+              `${f.chat.slice(0, 22).padEnd(22)} ${f.sender.slice(0, 20).padEnd(20)} ${label.slice(0, 44)}`,
+          );
+        }
+        console.log(`\n${found.length} item(s); ! = indexed but not downloaded`);
         return 0;
       }
       default:

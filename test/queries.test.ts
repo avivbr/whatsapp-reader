@@ -72,14 +72,16 @@ describe("readChat", () => {
   it("keeps the most recent when limited", () => {
     const messages = readChat(db, "Family", { limit: 2 }).messages;
     assert.equal(messages.length, 2);
-    assert.ok(messages.at(-1)!.date.startsWith("2026-06-10"));
+    assert.ok(messages.at(-1)!.date.startsWith("2026-06-14"));
   });
 
   it("filters to messages carrying media", () => {
     const messages = readChat(db, "Family", { mediaOnly: true }).messages;
-    assert.equal(messages.length, 1);
+    assert.deepEqual(
+      messages.map((m) => m.kind),
+      ["image", "document", "video", "voice", "image"],
+    );
     assert.equal(messages[0]!.media, "Media/1/a/pic.jpg");
-    assert.equal(messages[0]!.kind, "image");
   });
 
   it("treats until as exclusive", () => {
@@ -152,8 +154,8 @@ describe("searchMessages", () => {
 describe("stats", () => {
   it("totals", () => {
     const s = stats(db);
-    assert.equal(s.messages, 7);
-    assert.equal(s.fromMe, 1);
+    assert.equal(s.messages, 11);
+    assert.equal(s.fromMe, 2);
     assert.equal(s.chats, 3);
     assert.equal(s.contacts, 2);
   });
@@ -161,6 +163,9 @@ describe("stats", () => {
   it("labels types", () => {
     const s = stats(db);
     assert.equal(s.byType["text"], 6);
-    assert.equal(s.byType["image"], 1);
+    assert.equal(s.byType["image"], 2);
+    assert.equal(s.byType["document"], 1);
+    assert.equal(s.byType["video"], 1);
+    assert.equal(s.byType["voice"], 1);
   });
 });
