@@ -49,7 +49,7 @@ export function buildStore(): string {
     "INSERT INTO ZWACHATSESSION (Z_PK, ZPARTNERNAME, ZSESSIONTYPE, ZCONTACTJID) VALUES (?,?,?,?)",
   );
   session.run(1, "Family", 1, "grp@g.us");
-  session.run(2, "Dana Cohen", 0, "555@s.whatsapp.net");
+  session.run(2, "Dana Cohen", 0, "972500000555@s.whatsapp.net");
   session.run(3, "Family Reunion", 1, "grp2@g.us");
 
   const member = chat.prepare("INSERT INTO ZWAGROUPMEMBER (Z_PK, ZMEMBERJID) VALUES (?,?)");
@@ -59,7 +59,7 @@ export function buildStore(): string {
 
   const push = chat.prepare("INSERT INTO ZWAPROFILEPUSHNAME (ZJID, ZPUSHNAME) VALUES (?,?)");
   push.run("222@lid", "Yossi");
-  push.run("999@s.whatsapp.net", "Direct Pushname");
+  push.run("972500000999@s.whatsapp.net", "Direct Pushname");
 
   chat
     .prepare("INSERT INTO ZWAMEDIAITEM (Z_PK, ZMEDIALOCALPATH) VALUES (?,?)")
@@ -80,7 +80,7 @@ export function buildStore(): string {
   // outgoing
   msg.run(4, 1, 1, null, null, cd("2026-04-10"), null, "my reply", 0, null);
   // direct message resolved via ZWHATSAPPID
-  msg.run(5, 0, 2, null, null, cd("2026-05-10"), "555@s.whatsapp.net", "dinner?", 0, JUNK);
+  msg.run(5, 0, 2, null, null, cd("2026-05-10"), "972500000555@s.whatsapp.net", "dinner?", 0, JUNK);
   // image carrying a media path, no text
   msg.run(6, 0, 1, 10, 1, cd("2026-06-10"), "grp@g.us", null, 1, JUNK);
   // a second chat whose name shares a prefix with the first
@@ -97,8 +97,8 @@ export function buildStore(): string {
   const contact = contacts.prepare(
     "INSERT INTO ZWAADDRESSBOOKCONTACT (ZFULLNAME, ZLID, ZWHATSAPPID, ZPHONENUMBER) VALUES (?,?,?,?)",
   );
-  contact.run("Ada Lovelace", "111@lid", "111@s.whatsapp.net", "+972500000111");
-  contact.run("Dana Cohen", "444@lid", "555@s.whatsapp.net", "+972500000555");
+  contact.run("Ada Lovelace", "111@lid", "972500000111@s.whatsapp.net", "+972500000111");
+  contact.run("Dana Cohen", "444@lid", "972500000555@s.whatsapp.net", "+972500000555");
   contacts.close();
 
   const lid = new DatabaseSync(join(dir, LID_DB));
