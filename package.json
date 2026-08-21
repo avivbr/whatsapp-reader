@@ -7,7 +7,7 @@
   "engines": { "node": ">=24" },
   "bin": { "wa": "./src/cli.ts" },
   "scripts": {
-    "test": "node --no-warnings --test test/",
+    "test": "node --no-warnings --test \"test/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "server": "node --no-warnings src/server.ts"
   },
