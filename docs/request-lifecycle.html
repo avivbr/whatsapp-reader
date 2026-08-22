@@ -1,0 +1,409 @@
+<title>Request Lifecycle</title>
+
+<style>
+  :root {
+    --ground: #F2F5F4; --surface: #FFFFFF; --surface-2: #E9EEEC;
+    --ink: #131C1B; --ink-soft: #3D4C4A; --muted: #5F6E6C; --hairline: #D6DEDB;
+    --accent: #0B6B63; --accent-sf: #E0EFEC; --danger: #A33A26; --danger-sf: #F6E7E2;
+    --serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --measure: 68ch; --wide: 1020px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0D1413; --surface: #141D1C; --surface-2: #1B2625;
+      --ink: #E5EBE9; --ink-soft: #C2CECB; --muted: #8B9A97; --hairline: #263433;
+      --accent: #58CFBE; --accent-sf: #12302C; --danger: #E0836A; --danger-sf: #33211C;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0D1413; --surface: #141D1C; --surface-2: #1B2625;
+    --ink: #E5EBE9; --ink-soft: #C2CECB; --muted: #8B9A97; --hairline: #263433;
+    --accent: #58CFBE; --accent-sf: #12302C; --danger: #E0836A; --danger-sf: #33211C;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: var(--sans); font-size: 17px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: var(--wide); margin: 0 auto; padding: 0 24px 120px; }
+  .col { max-width: var(--measure); }
+  header.masthead { padding: 88px 0 40px; border-bottom: 1px solid var(--hairline); margin-bottom: 56px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--accent); margin: 0 0 20px; }
+  h1 { font-family: var(--serif); font-weight: 600; font-size: clamp(2.5rem, 6vw, 3.9rem); line-height: 1.04; letter-spacing: -0.02em; text-wrap: balance; margin: 0 0 24px; }
+  .standfirst { font-family: var(--serif); font-size: clamp(1.15rem, 2.2vw, 1.4rem); line-height: 1.5; color: var(--ink-soft); margin: 0; max-width: 60ch; }
+  section { margin-bottom: 76px; }
+  h2 { font-family: var(--serif); font-size: clamp(1.7rem, 3.4vw, 2.2rem); font-weight: 600; letter-spacing: -0.015em; line-height: 1.15; text-wrap: balance; margin: 0 0 8px; }
+  h3 { font-family: var(--sans); font-size: 1.02rem; font-weight: 650; margin: 36px 0 10px; }
+  .sec-label { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 0 0 14px; padding-bottom: 10px; border-bottom: 1px solid var(--hairline); }
+  p { margin: 0 0 18px; max-width: var(--measure); }
+  a { color: var(--accent); text-underline-offset: 3px; }
+  code { font-family: var(--mono); font-size: 0.87em; background: var(--surface-2); padding: 0.12em 0.4em; border-radius: 4px; }
+  strong { font-weight: 650; }
+  ul, ol { max-width: var(--measure); padding-left: 1.15rem; margin: 0 0 18px; }
+  li { margin-bottom: 9px; }
+  .note { border-left: 3px solid var(--accent); background: var(--accent-sf); padding: 16px 20px; margin: 26px 0; max-width: var(--measure); border-radius: 0 6px 6px 0; }
+  .note p:last-child { margin-bottom: 0; }
+  .note .tag { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); display: block; margin-bottom: 7px; }
+  .note.caution { border-left-color: var(--danger); background: var(--danger-sf); }
+  .note.caution .tag { color: var(--danger); }
+  figure { margin: 40px 0; padding: 28px 24px 20px; background: var(--surface); border: 1px solid var(--hairline); border-radius: 10px; overflow-x: auto; }
+  figure svg { display: block; width: 100%; max-width: 100%; height: auto; min-width: 560px; color: var(--ink-soft); }
+  figcaption { font-size: 14.5px; line-height: 1.55; color: var(--muted); margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--hairline); max-width: 76ch; }
+  .d-box { fill: var(--surface-2); stroke: var(--hairline); stroke-width: 1.5; }
+  .d-box-a { fill: var(--accent-sf); stroke: var(--accent); stroke-width: 1.5; }
+  .d-box-d { fill: var(--danger-sf); stroke: var(--danger); stroke-width: 1.5; }
+  .d-line { stroke: currentColor; stroke-width: 1.6; fill: none; }
+  .d-line-a { stroke: var(--accent); stroke-width: 2; fill: none; }
+  .d-rule { stroke: var(--muted); stroke-width: 1.4; stroke-dasharray: 3 5; fill: none; }
+  .d-t { fill: var(--ink); font-family: var(--sans); font-size: 13px; }
+  .d-t-sm { fill: var(--muted); font-family: var(--mono); font-size: 10.5px; }
+  .d-t-a { fill: var(--accent); font-family: var(--mono); font-size: 10.5px; }
+  .d-mono { fill: var(--ink); font-family: var(--mono); font-size: 11.5px; }
+  .d-head { fill: currentColor; }
+  .d-head-a { fill: var(--accent); }
+  .table-wrap { overflow-x: auto; margin: 26px 0; }
+  table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 15px; }
+  th { text-align: left; font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); font-weight: 500; padding: 0 16px 10px 0; border-bottom: 1px solid var(--hairline); white-space: nowrap; }
+  td { padding: 12px 16px 12px 0; border-bottom: 1px solid var(--hairline); vertical-align: top; line-height: 1.5; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+  td code { background: none; padding: 0; color: var(--ink); }
+  tr:last-child td { border-bottom: none; }
+  .bar { display: inline-block; height: 9px; background: var(--accent); border-radius: 2px; vertical-align: middle; }
+  .bar.slow { background: var(--danger); }
+  .code-block { font-family: var(--mono); font-size: 13px; line-height: 1.7; background: var(--surface); border: 1px solid var(--hairline); border-radius: 10px; padding: 20px 24px; overflow-x: auto; margin: 24px 0; white-space: pre; color: var(--ink-soft); }
+  .code-block .c { color: var(--muted); }
+  .code-block .k { color: var(--accent); }
+  footer { border-top: 1px solid var(--hairline); padding-top: 26px; color: var(--muted); font-size: 14px; }
+  @media (max-width: 640px) { body { font-size: 16px; } header.masthead { padding-top: 56px; } figure { padding: 20px 14px 14px; } }
+</style>
+
+<div class="page">
+
+<header class="masthead">
+  <p class="eyebrow">Runtime architecture · whatsapp-reader</p>
+  <h1>What happens between your prompt and the database</h1>
+  <p class="standfirst">
+    A prompt you type in Claude Code becomes a JSON-RPC frame down a pipe, a
+    prepared SQLite statement, a few pages of disk, and a JSON reply back up the
+    same pipe. No HTTP, no endpoints, no network — traced and measured end to end.
+  </p>
+</header>
+
+<section>
+  <p class="sec-label">First, a correction</p>
+  <h2>There are no API endpoints</h2>
+  <div class="col">
+    <p>
+      It is natural to picture a tool call as an HTTP request to an endpoint. That
+      is not what happens here, and the difference is load-bearing for everything
+      below.
+    </p>
+    <p>
+      <code>whatsapp-reader</code> <strong>is a server</strong> — but a
+      <strong>stdio</strong> server, not an HTTP one. When Claude Code starts, it
+      <em>spawns the server as a child process</em> and holds it open for the whole
+      session. The two talk by writing <strong>JSON-RPC 2.0</strong> messages to
+      each other's pipes, one JSON object per line. There is no URL, no port, no
+      socket, nothing listening on the network. If you unplugged the machine from
+      every network it would work identically.
+    </p>
+    <p>
+      So "a tool Claude picks up and uses" is the right mental model. "An endpoint
+      Claude calls" is the wrong mechanical one — there is a process boundary and a
+      pipe, not a request and a route.
+    </p>
+  </div>
+
+  <div class="code-block"><span class="c"># what Claude Code actually runs (from .mcp.json)</span>
+node --no-warnings /Users/.../whatsapp-reader/src/server.ts
+
+<span class="c"># the two frames that open every session, on stdin:</span>
+{"jsonrpc":"2.0","id":1,"method":"<span class="k">initialize</span>","params":{...}}
+{"jsonrpc":"2.0","method":"<span class="k">notifications/initialized</span>"}
+
+<span class="c"># a tool call, on stdin:</span>
+{"jsonrpc":"2.0","id":7,"method":"<span class="k">tools/call</span>",
+ "params":{"name":"read_chat","arguments":{"chat":"Family","limit":50}}}
+
+<span class="c"># the reply, on stdout — one line, newline-terminated:</span>
+{"jsonrpc":"2.0","id":7,"result":{"content":[{"type":"text","text":"{...}"}]}}</div>
+</section>
+
+<section>
+  <p class="sec-label">The lifecycle</p>
+  <h2>Your prompt, from keystroke to answer</h2>
+  <div class="col">
+    <p>
+      Ten hops. You cross the process boundary twice — once down into the server,
+      once back — and the model is invoked twice: first to <em>decide</em> to call
+      the tool, then again to turn the result into an answer.
+    </p>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 900 470" role="img" aria-label="The ten-step request lifecycle from a typed prompt, through Claude's model deciding to call a tool, a JSON-RPC frame crossing the stdio process boundary into the server, zod validation, a query function, a prepared SQLite statement reading the snapshot and two attached databases, and the JSON reply travelling back up the pipe into the model's context and out as an answer.">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><polygon class="d-head" points="0,1 10,5 0,9"/></marker>
+        <marker id="ara" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><polygon class="d-head-a" points="0,1 10,5 0,9"/></marker>
+      </defs>
+
+      <!-- process boundary -->
+      <line class="d-rule" x1="450" y1="20" x2="450" y2="450"/>
+      <text class="d-t-sm" x="250" y="16" text-anchor="middle">CLAUDE CODE PROCESS</text>
+      <text class="d-t-sm" x="675" y="16" text-anchor="middle">whatsapp-reader CHILD PROCESS</text>
+
+      <!-- left column: Claude Code -->
+      <rect class="d-box" x="40" y="34" width="330" height="40" rx="6"/>
+      <text class="d-t" x="54" y="52">1 · you type a prompt</text>
+      <text class="d-t-sm" x="54" y="67">"who did I message yesterday?"</text>
+
+      <rect class="d-box" x="40" y="90" width="330" height="46" rx="6"/>
+      <text class="d-t" x="54" y="108">2 · the model reads the 9 tool schemas</text>
+      <text class="d-t-sm" x="54" y="124">and decides: call day_summary</text>
+
+      <rect class="d-box-a" x="40" y="152" width="330" height="40" rx="6"/>
+      <text class="d-t" x="54" y="170">3 · MCP client encodes a JSON-RPC frame</text>
+      <text class="d-t-sm" x="54" y="185">tools/call → writes one line to stdin</text>
+
+      <!-- boundary crossing down -->
+      <line class="d-line-a" x1="370" y1="172" x2="530" y2="172" marker-end="url(#ara)"/>
+      <text class="d-t-a" x="454" y="165">stdin pipe</text>
+
+      <!-- right column: server -->
+      <rect class="d-box" x="530" y="152" width="330" height="40" rx="6"/>
+      <text class="d-t" x="544" y="170">4 · transport reads a line, parses JSON</text>
+      <text class="d-t-sm" x="544" y="185">StdioServerTransport</text>
+
+      <rect class="d-box" x="530" y="208" width="330" height="40" rx="6"/>
+      <text class="d-t" x="544" y="226">5 · dispatch by name + zod validates args</text>
+      <text class="d-t-sm" x="544" y="241">bad input is rejected here, before any SQL</text>
+
+      <rect class="d-box" x="530" y="264" width="330" height="40" rx="6"/>
+      <text class="d-t" x="544" y="282">6 · tool handler opens a read-only handle</text>
+      <text class="d-t-sm" x="544" y="297">withDb() → openSnapshot()  ~6 ms</text>
+
+      <rect class="d-box" x="530" y="320" width="330" height="40" rx="6"/>
+      <text class="d-t" x="544" y="338">7 · query fn builds + runs prepared SQL</text>
+      <text class="d-t-sm" x="544" y="353">queries/summary.ts</text>
+
+      <!-- SQLite + files -->
+      <rect class="d-box-a" x="530" y="376" width="330" height="40" rx="6"/>
+      <text class="d-t" x="544" y="394">8 · SQLite reads pages from the snapshot</text>
+      <text class="d-t-sm" x="544" y="409">ChatStorage + ATTACH contacts, lid</text>
+
+      <line class="d-line" x1="695" y1="360" x2="695" y2="376" marker-end="url(#ar)"/>
+      <line class="d-line" x1="695" y1="304" x2="695" y2="320" marker-end="url(#ar)"/>
+      <line class="d-line" x1="695" y1="248" x2="695" y2="264" marker-end="url(#ar)"/>
+      <line class="d-line" x1="695" y1="192" x2="695" y2="208" marker-end="url(#ar)"/>
+
+      <!-- reply crossing back up -->
+      <rect class="d-box-a" x="530" y="428" width="330" height="34" rx="6"/>
+      <text class="d-t" x="544" y="449">9 · rows → JSON → one line to stdout</text>
+
+      <line class="d-line-a" x1="530" y1="445" x2="372" y2="445" marker-end="url(#ara)"/>
+      <text class="d-t-a" x="450" y="438">stdout pipe</text>
+
+      <rect class="d-box" x="40" y="428" width="330" height="34" rx="6"/>
+      <text class="d-t" x="54" y="449">10 · result re-enters the model → answer</text>
+
+      <line class="d-line" x1="205" y1="74" x2="205" y2="90" marker-end="url(#ar)"/>
+      <line class="d-line" x1="205" y1="136" x2="205" y2="152" marker-end="url(#ar)"/>
+      <path class="d-line" d="M205 462 L205 475 L30 475 L30 52 L38 52" marker-end="url(#ar)"/>
+      <text class="d-t-sm" x="70" y="472">answer shown to you</text>
+    </svg>
+    <figcaption>
+      Steps 4–9 are one process; steps 1, 2, 3 and 10 are another. The accent path
+      is the data crossing the pipe. The model runs at step 2 (choose the tool) and
+      again at step 10 (read the result) — the server itself contains no model, no
+      network, and no state between calls.
+    </figcaption>
+  </figure>
+</section>
+
+<section>
+  <p class="sec-label">The data path</p>
+  <h2>How a tool call becomes rows</h2>
+  <div class="col">
+    <p>
+      Inside step 7, the layering is deliberately flat. A tool handler is a thin
+      adapter; the query function it calls is a pure function of a database handle.
+      The same function backs the <code>wa</code> CLI, so the two cannot disagree.
+    </p>
+  </div>
+  <div class="code-block"><span class="c">// tools.ts — the adapter, ~10 lines</span>
+server.registerTool("day_summary", { inputSchema: z.object({ date: DATE.optional() }) },
+  async ({ date }) =&gt; json(withDb((db) =&gt; daySummary(db, date))));
+
+<span class="c">// withDb: open read-only, always close — no handle survives the call</span>
+function withDb(fn) {
+  const db = openSnapshot();          <span class="c">// new DatabaseSync(..., { readOnly: true })</span>
+  try { return fn(db); } finally { db.close(); }
+}
+
+<span class="c">// queries/summary.ts — the logic, pure over the handle</span>
+db.prepare(`SELECT ... FROM ZWAMESSAGE m
+            WHERE date(m.ZMESSAGEDATE + 978307200,'unixepoch','localtime') = ?`).all(day);
+</div>
+  <div class="note">
+    <span class="tag">Every call is independent</span>
+    <p>
+      A fresh handle per call, closed in a <code>finally</code>. Nothing is cached
+      or held between calls, so two calls cannot interfere and a crash in one leaks
+      nothing into the next. The only durable state in the whole system is the
+      snapshot file on disk.
+    </p>
+  </div>
+</section>
+
+<section>
+  <p class="sec-label">Performance</p>
+  <h2>Where the milliseconds go</h2>
+  <div class="col">
+    <p>
+      Warm medians of five runs against the real store — 166,655 messages, 1,266
+      chats — with the OS page cache primed. Cold numbers are two to ten times
+      higher and dominated entirely by first-touch disk reads, not by the code.
+    </p>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Operation</th><th>Warm median</th><th></th></tr></thead>
+      <tbody>
+        <tr><td><code>resolve_phone</code></td><td class="num">0.1 ms</td><td><span class="bar" style="width:2px"></span></td></tr>
+        <tr><td><code>resolve_chat</code></td><td class="num">0.3 ms</td><td><span class="bar" style="width:2px"></span></td></tr>
+        <tr><td><code>search</code> — common term</td><td class="num">1.0 ms</td><td><span class="bar" style="width:3px"></span></td></tr>
+        <tr><td><code>list_chats</code> (30)</td><td class="num">15.8 ms</td><td><span class="bar" style="width:12px"></span></td></tr>
+        <tr><td><code>read_chat</code> (50)</td><td class="num">20.9 ms</td><td><span class="bar" style="width:16px"></span></td></tr>
+        <tr><td><code>stats</code></td><td class="num">121.9 ms</td><td><span class="bar" style="width:92px"></span></td></tr>
+        <tr><td><code>search</code> — rare / absent term</td><td class="num">231.4 ms</td><td><span class="bar slow" style="width:174px"></span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>The search asymmetry is the interesting one</h3>
+  <p>
+    A common word (<code>תודה</code>, "thank you") returns in <strong>1 ms</strong>;
+    a rare or absent one takes <strong>231 ms</strong>. Same query, 200× apart.
+    Search is a <code>LIKE</code> scan with no full-text index, so a common term
+    fills its <code>LIMIT 50</code> after reading a handful of rows and stops,
+    while a rare term forces SQLite to walk all 166k message bodies before it can
+    be sure there are no more matches. The absent-term case is the true cost of the
+    scan; the common-term case just gets to quit early.
+  </p>
+
+  <h3>stats is a strftime over every row</h3>
+  <p>
+    Its 122 ms is almost entirely the by-year breakdown, which runs
+    <code>strftime('%Y', …, 'localtime')</code> against all 166k timestamps.
+    Acceptable for a summary you request occasionally; it would be the first thing
+    to precompute if it were called on every turn.
+  </p>
+
+  <div class="note caution">
+    <span class="tag">Measurement honesty</span>
+    <p>
+      These were taken at load average ~4. Earlier in the session the same
+      <code>stats</code> call measured anywhere from 120 ms to 2,700 ms — that
+      spread was the machine sitting at load 14 under a pile of parallel work, not
+      the query. On a loaded box, cold I/O and CPU contention dominate everything
+      here, so treat these as a floor, not a guarantee.
+    </p>
+  </div>
+
+  <h3>What is deliberately not optimised</h3>
+  <p>
+    No FTS5 index. It would turn the 231 ms rare-term search into single-digit
+    milliseconds, but it has to be built and kept current at snapshot time, and
+    search is run a handful of times per session. The cost is not worth paying for
+    a query that is already fast whenever it matters. If search became a hot path,
+    this is the one change to make.
+  </p>
+</section>
+
+<section>
+  <p class="sec-label">Test plan</p>
+  <h2>Testing by layer</h2>
+  <div class="col">
+    <p>
+      The system is a stack — transport, dispatch, query, SQL, files — and each
+      layer can fail in ways the others cannot see. The plan tests each at the
+      level where its failures actually live, rather than pushing everything
+      through one end.
+    </p>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Layer</th><th>What can break</th><th>How it is tested</th><th class="num">Tests</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Protocol</strong><br><code>server.ts</code></td>
+          <td>handshake, framing, schema derivation, dispatch, errors-as-data, bad-input rejection</td>
+          <td>spawn the real server as a child process, speak JSON-RPC over stdio against a fixture via <code>WA_DATA_DIR</code></td>
+          <td class="num">11</td>
+        </tr>
+        <tr>
+          <td><strong>Queries</strong><br><code>queries/*</code></td>
+          <td>sender-resolution chain, date windows, ambiguity, search scoping</td>
+          <td>pure functions over a synthetic store that reproduces both schema traps</td>
+          <td class="num">54</td>
+        </tr>
+        <tr>
+          <td><strong>Media</strong><br><code>queries/media.ts</code></td>
+          <td>kind filters, real filenames, on-disk vs indexed, safe output names</td>
+          <td>a synthetic media tree with one deliberately absent file</td>
+          <td class="num">20</td>
+        </tr>
+        <tr>
+          <td><strong>Offline</strong><br>invariant</td>
+          <td>a network dependency creeping in</td>
+          <td>no network imports in any source file; query path run with <code>fetch</code> disabled</td>
+          <td class="num">4</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <span class="tag">The gap this session closed</span>
+    <p>
+      The 80 tests that existed all sat <em>below the transport</em>. The server,
+      the handshake, zod validation, and dispatch were only ever checked by hand.
+      The new protocol layer (11 tests) spawns the real binary and drives it over
+      the wire, so the exact path Claude Code uses is now covered — including that
+      a schema-violating <code>limit</code> and an unknown tool name are both
+      <em>rejected</em> rather than executed. <strong>91 tests total.</strong>
+    </p>
+  </div>
+
+  <h3>What the fixture proves</h3>
+  <p>
+    Tests run against a hand-built SQLite store, not your real data, so they are
+    deterministic and safe in CI. It deliberately reproduces the two traps that
+    caused real bugs: <code>ZCONTACTNAME</code> as the empty string on every row,
+    and <code>ZPUSHNAME</code> as base64 protobuf. Two tests assert directly that
+    no sender renders blank and no protobuf leaks — the failures those columns
+    cause are silent, so they need naming out loud.
+  </p>
+
+  <h3>Not yet covered</h3>
+  <ul>
+    <li><strong>The CLI adapter</strong> — <code>cli.ts</code> argument parsing has no test; it is exercised only by hand. Lower risk than the server, since it shares the query layer, but it is the remaining untested surface.</li>
+    <li><strong>Snapshot fidelity against the live store</strong> — verified once by hand (row-count parity with the prior implementation), not in the automated suite, because it needs a real WhatsApp container to run against.</li>
+  </ul>
+</section>
+
+<footer>
+  <p>
+    Runtime architecture for <code>avivbr/whatsapp-reader</code>. Lifecycle traced
+    and latencies measured on macOS with Node v24.11.1 against a live 166,655-message
+    snapshot. Companion to <code>docs/architecture.html</code>, which covers the
+    design decisions.
+  </p>
+</footer>
+
+</div>
