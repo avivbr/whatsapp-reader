@@ -1,0 +1,533 @@
+<title>WhatsApp Reader Internals</title>
+
+<style>
+  :root {
+    --ground: #F2F5F4; --surface: #FFFFFF; --surface-2: #E9EEEC;
+    --ink: #131C1B; --ink-soft: #3D4C4A; --muted: #5F6E6C; --hairline: #D6DEDB;
+    --accent: #0B6B63; --accent-sf: #E0EFEC; --danger: #A33A26; --danger-sf: #F6E7E2;
+    --warn: #8A6212; --warn-sf: #F7EFDC;
+    --serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --measure: 68ch; --wide: 1060px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0D1413; --surface: #141D1C; --surface-2: #1B2625;
+      --ink: #E5EBE9; --ink-soft: #C2CECB; --muted: #8B9A97; --hairline: #263433;
+      --accent: #58CFBE; --accent-sf: #12302C; --danger: #E0836A; --danger-sf: #33211C;
+      --warn: #D6A84A; --warn-sf: #2E2616;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0D1413; --surface: #141D1C; --surface-2: #1B2625;
+    --ink: #E5EBE9; --ink-soft: #C2CECB; --muted: #8B9A97; --hairline: #263433;
+    --accent: #58CFBE; --accent-sf: #12302C; --danger: #E0836A; --danger-sf: #33211C;
+    --warn: #D6A84A; --warn-sf: #2E2616;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: var(--sans); font-size: 17px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: var(--wide); margin: 0 auto; padding: 0 24px 120px; }
+  .col { max-width: var(--measure); }
+  header.masthead { padding: 88px 0 40px; border-bottom: 1px solid var(--hairline); margin-bottom: 56px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--accent); margin: 0 0 20px; }
+  h1 { font-family: var(--serif); font-weight: 600; font-size: clamp(2.4rem, 5.5vw, 3.7rem); line-height: 1.05; letter-spacing: -0.02em; text-wrap: balance; margin: 0 0 24px; }
+  .standfirst { font-family: var(--serif); font-size: clamp(1.1rem, 2.1vw, 1.35rem); line-height: 1.5; color: var(--ink-soft); margin: 0; max-width: 62ch; }
+  section { margin-bottom: 76px; }
+  h2 { font-family: var(--serif); font-size: clamp(1.65rem, 3.2vw, 2.1rem); font-weight: 600; letter-spacing: -0.015em; line-height: 1.15; text-wrap: balance; margin: 0 0 8px; }
+  h3 { font-family: var(--sans); font-size: 1rem; font-weight: 650; margin: 34px 0 10px; }
+  h4 { font-family: var(--mono); font-size: 0.82rem; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; color: var(--accent); margin: 28px 0 8px; }
+  .sec-label { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 0 0 14px; padding-bottom: 10px; border-bottom: 1px solid var(--hairline); }
+  p { margin: 0 0 18px; max-width: var(--measure); }
+  a { color: var(--accent); text-underline-offset: 3px; }
+  code { font-family: var(--mono); font-size: 0.87em; background: var(--surface-2); padding: 0.12em 0.4em; border-radius: 4px; }
+  strong { font-weight: 650; }
+  ul, ol { max-width: var(--measure); padding-left: 1.15rem; margin: 0 0 18px; }
+  li { margin-bottom: 9px; }
+  .note { border-left: 3px solid var(--accent); background: var(--accent-sf); padding: 16px 20px; margin: 26px 0; max-width: var(--measure); border-radius: 0 6px 6px 0; }
+  .note p:last-child { margin-bottom: 0; }
+  .note .tag { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); display: block; margin-bottom: 7px; }
+  .note.caution { border-left-color: var(--danger); background: var(--danger-sf); }
+  .note.caution .tag { color: var(--danger); }
+  .note.warn { border-left-color: var(--warn); background: var(--warn-sf); }
+  .note.warn .tag { color: var(--warn); }
+  figure { margin: 40px 0; padding: 28px 24px 20px; background: var(--surface); border: 1px solid var(--hairline); border-radius: 10px; overflow-x: auto; }
+  figure svg { display: block; width: 100%; max-width: 100%; height: auto; min-width: 600px; color: var(--ink-soft); }
+  figcaption { font-size: 14.5px; line-height: 1.55; color: var(--muted); margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--hairline); max-width: 76ch; }
+  .d-box { fill: var(--surface-2); stroke: var(--hairline); stroke-width: 1.5; }
+  .d-box-a { fill: var(--accent-sf); stroke: var(--accent); stroke-width: 1.5; }
+  .d-box-w { fill: var(--warn-sf); stroke: var(--warn); stroke-width: 1.5; }
+  .d-line { stroke: currentColor; stroke-width: 1.4; fill: none; opacity: 0.65; }
+  .d-line-a { stroke: var(--accent); stroke-width: 1.8; fill: none; }
+  .d-rule { stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 3 5; fill: none; }
+  .d-t { fill: var(--ink); font-family: var(--sans); font-size: 12.5px; }
+  .d-mono { fill: var(--ink); font-family: var(--mono); font-size: 12px; }
+  .d-t-sm { fill: var(--muted); font-family: var(--mono); font-size: 10.5px; }
+  .d-t-a { fill: var(--accent); font-family: var(--mono); font-size: 10.5px; }
+  .d-head { fill: currentColor; opacity: 0.65; }
+  .d-head-a { fill: var(--accent); }
+  .table-wrap { overflow-x: auto; margin: 24px 0; }
+  table { border-collapse: collapse; width: 100%; min-width: 600px; font-size: 14.5px; }
+  th { text-align: left; font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); font-weight: 500; padding: 0 14px 10px 0; border-bottom: 1px solid var(--hairline); white-space: nowrap; }
+  td { padding: 11px 14px 11px 0; border-bottom: 1px solid var(--hairline); vertical-align: top; line-height: 1.5; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+  td code { background: none; padding: 0; color: var(--ink); }
+  tr:last-child td { border-bottom: none; }
+  .trap { color: var(--danger); font-weight: 650; }
+  .code-block { font-family: var(--mono); font-size: 12.5px; line-height: 1.75; background: var(--surface); border: 1px solid var(--hairline); border-radius: 10px; padding: 20px 24px; overflow-x: auto; margin: 22px 0; white-space: pre; color: var(--ink-soft); }
+  .code-block .c { color: var(--muted); }
+  .code-block .k { color: var(--accent); }
+  .code-block .x { color: var(--danger); }
+  dl.sig { margin: 20px 0; max-width: var(--measure); }
+  dl.sig dt { font-family: var(--mono); font-size: 13px; color: var(--ink); background: var(--surface-2); padding: 7px 11px; border-radius: 5px; margin-top: 14px; overflow-x: auto; white-space: pre; }
+  dl.sig dd { margin: 8px 0 0 2px; font-size: 15.5px; color: var(--ink-soft); }
+  footer { border-top: 1px solid var(--hairline); padding-top: 26px; color: var(--muted); font-size: 14px; }
+  @media (max-width: 640px) { body { font-size: 16px; } header.masthead { padding-top: 56px; } figure { padding: 20px 14px 14px; } }
+</style>
+
+<div class="page">
+
+<header class="masthead">
+  <p class="eyebrow">Low-level design · 2,333 lines · 91 tests</p>
+  <h1>Reader internals</h1>
+  <p class="standfirst">
+    Module topology, layer contracts, the complete Core Data column mapping with
+    every trap named, the sender-resolution algorithm, and the invariants that
+    hold the whole thing together.
+  </p>
+</header>
+
+<section>
+  <p class="sec-label">Orientation</p>
+  <h2>Three documents, three questions</h2>
+  <div class="col">
+    <p>
+      This is the structural reference. Its companions answer different questions,
+      and none of the three repeats another:
+    </p>
+    <ul>
+      <li><code>architecture.html</code> — <strong>why</strong> the system is shaped this way: the ban constraint, the snapshot decision, the library choices.</li>
+      <li><code>request-lifecycle.html</code> — <strong>what happens at runtime</strong>: the ten hops from prompt to disk, measured latencies, the test plan.</li>
+      <li><strong>this document</strong> — <strong>how it is built</strong>: modules, types, signatures, columns, contracts, invariants.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <p class="sec-label">Topology</p>
+  <h2>Four layers, one direction</h2>
+  <div class="col">
+    <p>
+      Dependencies point strictly downward. Nothing in <code>queries/</code>
+      imports an adapter, and no adapter imports another. That is what makes the
+      CLI and the MCP server incapable of disagreeing: they are siblings over a
+      shared core, not variations of each other.
+    </p>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 940 430" role="img" aria-label="Module dependency graph in four layers: two entry points at the top, two sibling adapters below them, six query modules, and three leaf modules at the base with no internal dependencies. All arrows point downward; media.ts is the only query module that also reaches db.ts for filesystem access.">
+      <defs>
+        <marker id="m1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><polygon class="d-head" points="0,1 10,5 0,9"/></marker>
+        <marker id="m1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><polygon class="d-head-a" points="0,1 10,5 0,9"/></marker>
+      </defs>
+
+      <text class="d-t-sm" x="8" y="20">ENTRY</text>
+      <line class="d-rule" x1="8" y1="28" x2="932" y2="28"/>
+      <rect class="d-box-a" x="120" y="38" width="180" height="36" rx="6"/>
+      <text class="d-mono" x="210" y="61" text-anchor="middle">server.ts</text>
+      <rect class="d-box-a" x="640" y="38" width="180" height="36" rx="6"/>
+      <text class="d-mono" x="730" y="61" text-anchor="middle">cli.ts</text>
+
+      <text class="d-t-sm" x="8" y="112">ADAPTERS</text>
+      <line class="d-rule" x1="8" y1="120" x2="932" y2="120"/>
+      <rect class="d-box" x="120" y="130" width="180" height="40" rx="6"/>
+      <text class="d-mono" x="210" y="149" text-anchor="middle">tools.ts</text>
+      <text class="d-t-sm" x="210" y="163" text-anchor="middle">zod + registerTool</text>
+
+      <line class="d-line-a" x1="210" y1="74" x2="210" y2="128" marker-end="url(#m1a)"/>
+      <!-- cli is itself the adapter; drawn spanning both bands -->
+      <line class="d-line-a" x1="730" y1="74" x2="730" y2="212" marker-end="url(#m1a)"/>
+      <text class="d-t-sm" x="738" y="150">cli.ts is its own adapter</text>
+      <text class="d-t-sm" x="738" y="164">— parses argv, calls queries</text>
+
+      <text class="d-t-sm" x="8" y="206">QUERIES · pure functions over a DatabaseSync handle</text>
+      <line class="d-rule" x1="8" y1="214" x2="932" y2="214"/>
+      <line class="d-line-a" x1="210" y1="170" x2="210" y2="222" marker-end="url(#m1a)"/>
+
+      <rect class="d-box" x="30" y="224" width="132" height="52" rx="6"/>
+      <text class="d-mono" x="96" y="245" text-anchor="middle">chats.ts</text>
+      <text class="d-t-sm" x="96" y="262" text-anchor="middle">listChats</text>
+      <text class="d-t-sm" x="96" y="272" text-anchor="middle">resolveChat</text>
+
+      <rect class="d-box" x="176" y="224" width="132" height="52" rx="6"/>
+      <text class="d-mono" x="242" y="245" text-anchor="middle">messages.ts</text>
+      <text class="d-t-sm" x="242" y="262" text-anchor="middle">readChat</text>
+      <text class="d-t-sm" x="242" y="272" text-anchor="middle">searchMessages</text>
+
+      <rect class="d-box" x="322" y="224" width="118" height="52" rx="6"/>
+      <text class="d-mono" x="381" y="245" text-anchor="middle">stats.ts</text>
+      <text class="d-t-sm" x="381" y="262" text-anchor="middle">stats</text>
+
+      <rect class="d-box" x="454" y="224" width="132" height="52" rx="6"/>
+      <text class="d-mono" x="520" y="245" text-anchor="middle">people.ts</text>
+      <text class="d-t-sm" x="520" y="262" text-anchor="middle">resolvePhone</text>
+      <text class="d-t-sm" x="520" y="272" text-anchor="middle">resolvePhones</text>
+
+      <rect class="d-box" x="600" y="224" width="132" height="52" rx="6"/>
+      <text class="d-mono" x="666" y="245" text-anchor="middle">summary.ts</text>
+      <text class="d-t-sm" x="666" y="262" text-anchor="middle">daySummary</text>
+
+      <rect class="d-box-w" x="746" y="224" width="164" height="52" rx="6"/>
+      <text class="d-mono" x="828" y="245" text-anchor="middle">media.ts</text>
+      <text class="d-t-sm" x="828" y="262" text-anchor="middle">findMedia</text>
+      <text class="d-t-sm" x="828" y="272" text-anchor="middle">exportMedia · touches fs</text>
+
+      <!-- intra-layer edge: messages and media depend on chats -->
+      <path class="d-line" d="M200 250 L166 250" marker-end="url(#m1)"/>
+      <path class="d-line" d="M770 288 L770 300 L120 300 L120 282" marker-end="url(#m1)"/>
+      <text class="d-t-sm" x="400" y="296">media.ts and messages.ts call resolveChat</text>
+
+      <text class="d-t-sm" x="8" y="336">LEAF · no internal dependencies</text>
+      <line class="d-rule" x1="8" y1="344" x2="932" y2="344"/>
+
+      <rect class="d-box-a" x="120" y="354" width="190" height="52" rx="6"/>
+      <text class="d-mono" x="215" y="375" text-anchor="middle">schema.ts</text>
+      <text class="d-t-sm" x="215" y="392" text-anchor="middle">constants · SQL fragments · dates</text>
+
+      <rect class="d-box-a" x="340" y="354" width="190" height="52" rx="6"/>
+      <text class="d-mono" x="435" y="375" text-anchor="middle">db.ts</text>
+      <text class="d-t-sm" x="435" y="392" text-anchor="middle">snapshot · openSnapshot · paths</text>
+
+      <rect class="d-box-a" x="560" y="354" width="190" height="52" rx="6"/>
+      <text class="d-mono" x="655" y="375" text-anchor="middle">queries/types.ts</text>
+      <text class="d-t-sm" x="655" y="392" text-anchor="middle">shapes · error classes</text>
+
+      <line class="d-line" x1="215" y1="310" x2="215" y2="352" marker-end="url(#m1)"/>
+      <line class="d-line" x1="435" y1="310" x2="435" y2="352" marker-end="url(#m1)"/>
+      <line class="d-line" x1="655" y1="310" x2="655" y2="352" marker-end="url(#m1)"/>
+      <line class="d-rule" x1="120" y1="310" x2="750" y2="310"/>
+    </svg>
+    <figcaption>
+      <code>media.ts</code> is amber because it is the one query module that reaches
+      <code>db.ts</code> for filesystem access — every other query module is pure
+      SQL over the handle it is given. <code>people.ts</code> imports nothing at all:
+      it inlines its own SQL because the sender-resolution fragments do not apply to
+      a phone lookup.
+    </figcaption>
+  </figure>
+
+  <h3>Layer contracts</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Layer</th><th>May</th><th>Must not</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Leaf</strong><br><code>schema · db · types</code></td>
+          <td>Define constants, open handles, own filesystem paths, declare shapes and errors</td>
+          <td>Import any query module or adapter. Know that MCP exists.</td>
+        </tr>
+        <tr>
+          <td><strong>Queries</strong><br><code>queries/*</code></td>
+          <td>Take a <code>DatabaseSync</code>, run SQL, return plain data, throw the typed errors</td>
+          <td>Open or close a handle. Read <code>process.env</code>. Format output for humans. Catch its own errors.</td>
+        </tr>
+        <tr>
+          <td><strong>Adapters</strong><br><code>tools · cli</code></td>
+          <td>Own handle lifetime, validate input, catch typed errors, format output</td>
+          <td>Contain SQL. Import each other.</td>
+        </tr>
+        <tr>
+          <td><strong>Entry</strong><br><code>server · cli</code></td>
+          <td>Wire a transport, parse argv</td>
+          <td>Anything else.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <span class="tag">Why queries never open handles</span>
+    <p>
+      Handle lifetime belongs to whoever knows when the request ends. A query
+      function that opened its own connection could not be composed — and
+      <code>readChat</code> calls <code>resolveChat</code>, which would mean two
+      connections for one logical read. Adapters open once, pass down, close in a
+      <code>finally</code>.
+    </p>
+  </div>
+</section>
+
+<section>
+  <p class="sec-label">Data model</p>
+  <h2>Every column the reader touches</h2>
+  <div class="col">
+    <p>
+      Thirty-four Core Data columns across six tables in three databases. The names
+      are the hazard: several were reused from unrelated features and mean nothing
+      like what they say. Columns marked in red are actively misleading, and each
+      one cost real debugging time.
+    </p>
+  </div>
+
+  <h4>ChatStorage.sqlite — ZWAMESSAGE</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Column</th><th>Holds</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td><code>ZMESSAGEDATE</code></td><td>timestamp</td><td>Core Data seconds from 2001-01-01. Add 978307200 for Unix.</td></tr>
+        <tr><td><code>ZTEXT</code></td><td>message body</td><td><code>NULL</code> for bare attachments — search skips those rows.</td></tr>
+        <tr><td><code>ZMESSAGETYPE</code></td><td>kind code</td><td>0 text, 1 image, 2 video, 3 voice, 4 contact, 5 location, 7 link, 8 document, 15 sticker. Long tail rendered as <code>type:N</code>.</td></tr>
+        <tr><td><code>ZISFROMME</code></td><td>direction</td><td>1 outgoing. Outgoing rows carry no sender at all.</td></tr>
+        <tr><td><code>ZFROMJID</code></td><td class="trap">the <em>group</em>, in group chats</td><td>Not the sender. In 1:1 chats it is the contact.</td></tr>
+        <tr><td><code>ZPUSHNAME</code></td><td class="trap">base64 protobuf</td><td>Never a name. Looks like the obvious sender field; is not.</td></tr>
+        <tr><td><code>ZCHATSESSION</code></td><td>FK → ZWACHATSESSION</td><td>Indexed. The cheap way to scope a query.</td></tr>
+        <tr><td><code>ZGROUPMEMBER</code></td><td>FK → ZWAGROUPMEMBER</td><td>The real route to a group sender.</td></tr>
+        <tr><td><code>ZMEDIAITEM</code></td><td>FK → ZWAMEDIAITEM</td><td>Present on every attachment.</td></tr>
+        <tr><td><code>ZSTARRED</code></td><td>flag</td><td>Surfaced as <code>Message.starred</code>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>ChatStorage.sqlite — other tables</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Table · column</th><th>Holds</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td><code>ZWACHATSESSION.ZPARTNERNAME</code></td><td>chat title</td><td>Group subject, or the saved contact name.</td></tr>
+        <tr><td><code>ZWACHATSESSION.ZSESSIONTYPE</code></td><td>kind</td><td>0 direct, 1 group, 2 broadcast, 3 status, 4 other.</td></tr>
+        <tr><td><code>ZWACHATSESSION.ZCONTACTJID</code></td><td>peer JID</td><td>Used to match a 1:1 chat to a phone number.</td></tr>
+        <tr><td><code>ZWAGROUPMEMBER.ZMEMBERJID</code></td><td><code>@lid</code> identifier</td><td>WhatsApp's privacy handle. The pivot for group senders.</td></tr>
+        <tr><td><code>ZWAGROUPMEMBER.ZCONTACTNAME</code></td><td class="trap">the empty string</td><td>On <strong>all 16,802 rows</strong>. A plain <code>COALESCE</code> latches onto it and every sender renders blank.</td></tr>
+        <tr><td><code>ZWAPROFILEPUSHNAME.ZJID / ZPUSHNAME</code></td><td>self-set display name</td><td>Keyed by either <code>@lid</code> or phone JID. The only name source for non-contacts.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>ZWAMEDIAITEM — three columns that lie about themselves</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Column</th><th>Name suggests</th><th>Actually holds</th></tr></thead>
+      <tbody>
+        <tr><td><code>ZAUTHORNAME</code></td><td class="trap">who sent it</td><td>The <strong>original filename</strong>. Documents only — but all of them.</td></tr>
+        <tr><td><code>ZVCARDSTRING</code></td><td class="trap">a vCard</td><td>The <strong>MIME type</strong>. Present for every kind.</td></tr>
+        <tr><td><code>ZTITLE</code></td><td class="trap">a filename</td><td>The sender's <strong>caption</strong>.</td></tr>
+        <tr><td><code>ZMEDIALOCALPATH</code></td><td>—</td><td>Path relative to <code>Message/</code>. Populated only once downloaded.</td></tr>
+        <tr><td><code>ZFILESIZE</code></td><td>—</td><td>Bytes. Set even when the file was never fetched.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>ContactsV2.sqlite and LID.sqlite</h4>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Table · column</th><th>Holds</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td><code>ZWAADDRESSBOOKCONTACT.ZFULLNAME</code></td><td>saved name</td><td>Your address book. 3,132 rows.</td></tr>
+        <tr><td><code>…ZLID</code> / <code>…ZWHATSAPPID</code> / <code>…ZPHONENUMBER</code></td><td>three join keys</td><td>The same person, reachable three ways. All three are tried.</td></tr>
+        <tr><td><code>ZWAZACCOUNT.ZPHONENUMBER → ZIDENTIFIER</code></td><td>phone → <code>@lid</code></td><td>9,916 rows. <strong>The only bridge</strong> from a number into the <code>@lid</code> namespace, and so the only way to name a non-contact.</td></tr>
+        <tr><td><code>ZWAZACCOUNT.ZDISPLAYNAME</code></td><td class="trap">a name</td><td>A <em>masked</em> number (<code>+972•••••••20</code>). Useless.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note caution">
+    <span class="tag">The empty-string trap, concretely</span>
+    <p>
+      <code>ZCONTACTNAME</code> is <code>''</code>, not <code>NULL</code>. SQL
+      <code>COALESCE</code> only skips <code>NULL</code>, so it returns the empty
+      string and every sender in every group renders blank — with no error
+      anywhere. <code>NULLIF(x, '')</code> around each candidate is load-bearing,
+      and two tests assert on it by name.
+    </p>
+  </div>
+</section>
+
+<section>
+  <p class="sec-label">Algorithm</p>
+  <h2>Resolving a sender</h2>
+  <div class="col">
+    <p>
+      The one genuinely intricate piece. It is a single SQL <code>CASE</code> with a
+      six-rung <code>COALESCE</code>, evaluated per row, backed by five
+      <code>LEFT JOIN</code>s. Rungs are ordered most to least authoritative.
+    </p>
+  </div>
+
+  <div class="code-block"><span class="c">// schema.ts — SENDER_SQL</span>
+CASE WHEN m.ZISFROMME = 1 THEN 'Me' ELSE COALESCE(
+    <span class="k">NULLIF</span>(cg.ZFULLNAME, ''),      <span class="c">// 1. address book, via @lid  ← group senders</span>
+    <span class="k">NULLIF</span>(cd.ZFULLNAME, ''),      <span class="c">// 2. address book, via phone JID  ← 1:1 senders</span>
+    <span class="k">NULLIF</span>(ppl.ZPUSHNAME, ''),     <span class="c">// 3. self-set name, keyed by @lid</span>
+    <span class="k">NULLIF</span>(ppd.ZPUSHNAME, ''),     <span class="c">// 4. self-set name, keyed by phone JID</span>
+    <span class="k">NULLIF</span>(gm.ZMEMBERJID, ''),     <span class="c">// 5. raw @lid</span>
+    <span class="k">NULLIF</span>(m.ZFROMJID, ''),        <span class="c">// 6. raw JID</span>
+    '(unknown)'
+) END
+
+<span class="c">// deliberately absent, and must stay absent:</span>
+<span class="x">gm.ZCONTACTNAME</span>   <span class="c">// '' on all 16,802 rows → blanks every sender</span>
+<span class="x">m.ZPUSHNAME</span>       <span class="c">// base64 protobuf, not a name</span></div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th class="num">Rung</th><th>Source</th><th>Reaches</th></tr></thead>
+      <tbody>
+        <tr><td class="num">0</td><td><code>ZISFROMME = 1</code> → <code>"Me"</code></td><td>Your own messages, which carry no sender row at all</td></tr>
+        <tr><td class="num">1</td><td><code>ZMEMBERJID</code> → <code>ZLID</code> → <code>ZFULLNAME</code></td><td>Saved contacts in group chats — the bulk of traffic</td></tr>
+        <tr><td class="num">2</td><td><code>ZFROMJID</code> → <code>ZWHATSAPPID</code> → <code>ZFULLNAME</code></td><td>Saved contacts in 1:1 chats</td></tr>
+        <tr><td class="num">3–4</td><td><code>ZWAPROFILEPUSHNAME</code>, either key</td><td>People never saved, who set their own name</td></tr>
+        <tr><td class="num">5–6</td><td>the raw identifier</td><td>Strangers in large groups. ~37% of rows; no local name exists for them.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    Measured coverage on the real store: <strong>63% resolve to a human name.</strong>
+    The remainder are neighbours in 19,000-message building groups who were never
+    added to the address book — not a bug, an absence of data.
+  </p>
+</section>
+
+<section>
+  <p class="sec-label">Reference</p>
+  <h2>Types and signatures</h2>
+
+  <h4>Leaf: db.ts</h4>
+  <dl class="sig">
+    <dt>snapshot(dest = DATA_DIR): string</dt>
+    <dd>Copies the three databases plus their <code>-wal</code>, checkpoints, chmods <code>0400</code>. Never copies <code>-shm</code>. Throws <code>SnapshotMissingError</code> if WhatsApp is not installed.</dd>
+    <dt>openSnapshot(dataDir = DATA_DIR): DatabaseSync</dt>
+    <dd>Opens read-only and <code>ATTACH</code>es <code>contacts</code> and <code>lid</code>. Substitutes empty in-memory tables when either is absent, so the joins stay valid.</dd>
+    <dt>snapshotAgeSeconds(dataDir = DATA_DIR): number | null</dt>
+    <dd>Drives the staleness hint every tool returns.</dd>
+    <dt>mediaPath(relative, root = MEDIA_ROOT): string | null</dt>
+    <dd><code>null</code> when the attachment was never downloaded. The <code>root</code> parameter exists so tests can substitute a synthetic tree — it is what made the media layer testable at all.</dd>
+  </dl>
+
+  <h4>Leaf: schema.ts</h4>
+  <dl class="sig">
+    <dt>tsSql(column): string</dt>
+    <dd>Wraps a column as <code>datetime(col + 978307200, 'unixepoch', 'localtime')</code>.</dd>
+    <dt>toCoreData(value): number</dt>
+    <dd>Parses <code>YYYY-MM-DD</code> as <strong>local</strong> midnight. Throws <code>RangeError</code> otherwise. Paired with <code>tsSql</code> so filtering and display agree.</dd>
+    <dt>messageTypeLabel(code) · sessionKindLabel(code)</dt>
+    <dd>Known codes to names; unknown codes to <code>type:N</code> / <code>kind:N</code> rather than a guess.</dd>
+  </dl>
+
+  <h4>Queries</h4>
+  <dl class="sig">
+    <dt>listChats(db, { query?, kind?, limit? }): Chat[]</dt>
+    <dd>Aggregates counts per chat. Over-fetches ×8 when filtering by kind, since the filter applies after grouping.</dd>
+    <dt>resolveChat(db, term): Chat</dt>
+    <dd>Name, unique substring, or numeric id. Queries <code>ZWACHATSESSION</code> alone rather than reusing <code>listChats</code>. Throws <code>ChatNotFoundError</code> or <code>AmbiguousChatError</code> — the latter carries <code>.matches</code>.</dd>
+    <dt>readChat(db, chat, { limit?, since?, until?, mediaOnly? })</dt>
+    <dd>Queries newest-first so <code>LIMIT</code> keeps the most recent, then reverses to present oldest-first. <code>until</code> is exclusive.</dd>
+    <dt>searchMessages(db, term, { chat?, sender?, since?, until?, limit? }): Message[]</dt>
+    <dd><code>LIKE</code> scan, no full-text index. Skips <code>NULL</code> text, so bare attachments never match.</dd>
+    <dt>resolvePhone(db, rawNumber): PersonMatch</dt>
+    <dd>Strips non-digits, then tries address book by JID, by normalised phone, by <code>@lid</code>; then push names; then a 1:1 chat title. <code>bestName</code> collapses the chain.</dd>
+    <dt>daySummary(db, date?): DaySummary</dt>
+    <dd>Splits <code>participated</code> from <code>activeOnly</code> on whether you sent anything. Day boundaries local. Defaults to today via SQL <code>date('now','localtime')</code>.</dd>
+    <dt>findMedia(db, { kinds?, chat?, sender?, since?, until?, onDiskOnly?, limit?, mediaRoot? })</dt>
+    <dd>Returns metadata without copying. Over-fetches ×4 when <code>onDiskOnly</code>, since existence is checked in JS.</dd>
+    <dt>exportMedia(db, destinationRoot, options): MediaExport</dt>
+    <dd>Documents keep their original filename, sanitised to letters, digits, <code>._-</code>. Other kinds get <code>timestamp_direction_uuid</code>. Never-downloaded items are counted in <code>missing</code>, not dropped.</dd>
+  </dl>
+
+  <h4>Core shapes</h4>
+  <div class="code-block">interface <span class="k">Message</span> { date; chat; sender; kind; text|null; media|null; starred }
+interface <span class="k">Chat</span>    { id; name; kind; messages; last|null }
+interface <span class="k">PersonMatch</span> { number; found; contactName|null; pushName|null;
+                        chatTitle|null; bestName|null; lid|null }
+interface <span class="k">MediaRecord</span> { date; chat; sender; kind; filename|null; mimeType|null;
+                        sizeBytes|null; caption|null; source; onDisk }</div>
+</section>
+
+<section>
+  <p class="sec-label">Failure modes</p>
+  <h2>Error taxonomy</h2>
+  <div class="col">
+    <p>
+      Four typed errors, each thrown by the query layer and caught by adapters.
+      The distinction that matters: two of them are <em>recoverable by the caller</em>
+      and become data, not failures.
+    </p>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Error</th><th>Thrown when</th><th>Adapter behaviour</th></tr></thead>
+      <tbody>
+        <tr><td><code>AmbiguousChatError</code></td><td>a substring matches several chats</td><td><strong>MCP:</strong> <code>{ error, candidates[] }</code> so the model can choose. <strong>CLI:</strong> prints the list, exit 1.</td></tr>
+        <tr><td><code>ChatNotFoundError</code></td><td>nothing matches</td><td><strong>MCP:</strong> <code>{ error }</code>. <strong>CLI:</strong> message, exit 1.</td></tr>
+        <tr><td><code>RangeError</code></td><td>an unparseable date</td><td>Message naming the expected format. MCP mostly prevents this earlier via zod's <code>YYYY-MM-DD</code> pattern.</td></tr>
+        <tr><td><code>SnapshotMissingError</code></td><td>no snapshot, or WhatsApp absent</td><td>Instruction to run <code>wa snapshot</code>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note">
+    <span class="tag">Ambiguity is a feature</span>
+    <p>
+      <code>"סן מרטין"</code> matches 14 chats. Guessing one would be worse than
+      failing, so the error carries all 14 names and the model picks. This is why
+      the query layer throws rather than returning <code>null</code> — the failure
+      has a payload.
+    </p>
+  </div>
+</section>
+
+<section>
+  <p class="sec-label">Invariants</p>
+  <h2>What must stay true</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Invariant</th><th>Enforced by</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Never contacts WhatsApp</strong></td><td><code>test/offline.test.ts</code> — no network-capable import in any source file, no endpoint strings, query path run with <code>fetch</code> disabled</td></tr>
+        <tr><td><strong>Never writes to WhatsApp's container</strong></td><td>Only <code>copyFileSync</code> out of it; <code>openSnapshot</code> passes <code>readOnly: true</code>, which the driver enforces</td></tr>
+        <tr><td><strong>Cannot send a message</strong></td><td>No such tool exists. Adding one would reintroduce the ban risk the design exists to avoid.</td></tr>
+        <tr><td><strong>No state between calls</strong></td><td><code>withDb</code> opens and closes per call in a <code>finally</code></td></tr>
+        <tr><td><strong>Dates are local everywhere</strong></td><td><code>tsSql</code> and <code>toCoreData</code> are the only date paths, and both use local time</td></tr>
+        <tr><td><strong>Snapshots are read-only on disk</strong></td><td><code>chmod 0400</code> after checkpoint; <code>snapshot()</code> re-chmods before overwriting</td></tr>
+        <tr><td><strong>No type-only syntax Node cannot strip</strong></td><td><code>erasableSyntaxOnly</code> in tsconfig — enums, namespaces, decorators and parameter properties become compile errors</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <p class="sec-label">Extending</p>
+  <h2>Adding a tool</h2>
+  <div class="col">
+    <p>
+      Four steps, in this order. The layering makes the order matter: the query
+      exists and is tested before anything can call it.
+    </p>
+    <ol>
+      <li>Write the function in <code>src/queries/</code>. Take <code>db</code> first, an options object second. Return plain data. Throw the typed errors; catch nothing.</li>
+      <li>Add tests against the fixture in <code>test/</code>. If it needs data the fixture lacks, extend <code>test/fixture.ts</code> — and expect to update the counts other tests assert on.</li>
+      <li>Register it in <code>src/tools.ts</code>: a zod schema, an annotation (<code>READ_ONLY</code> unless it writes), and a body that is <code>json(withDb(…))</code> and nothing more.</li>
+      <li>Add a case to <code>src/cli.ts</code> so it is reachable without a model in the loop.</li>
+    </ol>
+    <p>
+      Then extend <code>test/server.test.ts</code> to call it over the wire. The
+      tool count assertion there will fail until you do, which is deliberate.
+    </p>
+  </div>
+</section>
+
+<footer>
+  <p>
+    Low-level design for <code>avivbr/whatsapp-reader</code> at
+    <code>98e6c9a</code> onward — 2,333 lines of TypeScript, 91 tests, 2 runtime
+    dependencies. Column mappings verified against a live 166,655-message store.
+    See <code>architecture.html</code> for design rationale and
+    <code>request-lifecycle.html</code> for the runtime path.
+  </p>
+</footer>
+
+</div>
