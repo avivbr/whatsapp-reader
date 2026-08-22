@@ -21,7 +21,11 @@ export const CONTAINER = join(
 /** Media paths stored in the database are relative to this directory. */
 export const MEDIA_ROOT = join(CONTAINER, "Message");
 
-export const DATA_DIR = join(import.meta.dirname, "..", "data");
+/**
+ * Where snapshots live. Overridable via WA_DATA_DIR so the snapshot can sit on
+ * an external disk, and so tests can point the server at a fixture.
+ */
+export const DATA_DIR = process.env["WA_DATA_DIR"] ?? join(import.meta.dirname, "..", "data");
 
 export const CHAT_DB = "ChatStorage.sqlite";
 export const CONTACTS_DB = "ContactsV2.sqlite";
