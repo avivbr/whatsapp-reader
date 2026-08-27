@@ -78,6 +78,13 @@ describe("discovery", () => {
     assert.match(r.stdout, /--json/);
   });
 
+  it("exits 0 for a bare --help, with no command", () => {
+    // Asking for help is not a usage error, even though the output matches.
+    const r = wa("--help");
+    assert.equal(r.status, 0, "wa --help must succeed");
+    assert.match(r.stdout, /COMMANDS/);
+  });
+
   it("documents every command it accepts", () => {
     // The help text is how an agent discovers this tool; keep it complete.
     const help = wa().stdout;

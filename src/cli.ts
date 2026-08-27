@@ -119,9 +119,15 @@ export function run(argv: string[]): number {
     allowPositionals: true,
   });
   const [command, ...rest] = positionals;
-  if (!command || values.help) {
+  // Asking for help succeeds. Invoking with nothing at all is a usage error,
+  // even though both print the same text.
+  if (values.help) {
     console.log(USAGE);
-    return command ? 0 : 1;
+    return 0;
+  }
+  if (!command) {
+    console.log(USAGE);
+    return 1;
   }
   const limit = values.limit ? Number(values.limit) : undefined;
   if (values.limit !== undefined && !Number.isFinite(limit)) {
