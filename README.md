@@ -50,8 +50,15 @@ npm link          # puts `wa` on PATH, running straight from source
 There is no build step during development — Node 24 runs the TypeScript directly,
 so tests and `npm link` work against `src/`. Packaging does need one, because Node
 refuses to strip types under `node_modules`, so an installed copy has to ship
-JavaScript. `npm run build` emits `dist/`, and `prepare` runs it automatically on
-install, so this is invisible unless you are editing the build itself.
+JavaScript. `npm run build` emits `dist/` and `prepare` runs it on install, so it
+is invisible unless you are editing the build itself.
+
+The build uses Node's own `stripTypeScriptTypes` rather than `tsc`, so it needs
+nothing installed — npm does not reliably give `prepare` access to
+devDependencies, and a `tsc`-based build fails a git install with
+`tsc: command not found`. `tsc` remains the typechecker.
+
+An installed copy is ~80 kB: `dist/`, a README, and a licence.
 
 The snapshot lives in `~/Library/Application Support/whatsapp-reader`, not beside
 the code. Override with `WA_DATA_DIR` to put it on an external disk.
