@@ -512,7 +512,9 @@
         <tr>
           <td><code>process.features.typescript</code></td>
           <td class="num"><code>'strip'</code></td>
-          <td><strong>No build step.</strong> <code>.ts</code> runs directly.</td>
+          <td><strong>No build step to develop.</strong> <code>.ts</code> runs directly.
+              Packaging still needs one: Node refuses to strip types under
+              <code>node_modules</code>, so a published copy must ship JavaScript.</td>
         </tr>
         <tr>
           <td><code>node:test</code> / <code>node:assert</code></td>

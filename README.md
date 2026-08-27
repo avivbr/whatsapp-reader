@@ -30,12 +30,31 @@ reintroduce exactly the risk it was built to avoid.
 
 ## Install
 
+Install it as a tool:
+
 ```bash
-npm install    # devDependencies only
-npm link       # puts `wa` on PATH
+npm install -g github:avivbr/whatsapp-reader
 ```
 
-**Zero runtime dependencies.** No native compilation, no build step, no `dist/`.
+Or from a checkout, for development:
+
+```bash
+git clone git@github.com:avivbr/whatsapp-reader.git
+cd whatsapp-reader
+npm install
+npm link          # puts `wa` on PATH, running straight from source
+```
+
+**Zero runtime dependencies.** Nothing to compile, no native modules.
+
+There is no build step during development — Node 24 runs the TypeScript directly,
+so tests and `npm link` work against `src/`. Packaging does need one, because Node
+refuses to strip types under `node_modules`, so an installed copy has to ship
+JavaScript. `npm run build` emits `dist/`, and `prepare` runs it automatically on
+install, so this is invisible unless you are editing the build itself.
+
+The snapshot lives in `~/Library/Application Support/whatsapp-reader`, not beside
+the code. Override with `WA_DATA_DIR` to put it on an external disk.
 
 ## Use
 

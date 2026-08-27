@@ -22,10 +22,18 @@ export const CONTAINER = join(
 export const MEDIA_ROOT = join(CONTAINER, "Message");
 
 /**
- * Where snapshots live. Overridable via WA_DATA_DIR so the snapshot can sit on
- * an external disk, and so tests can point the server at a fixture.
+ * Where snapshots live.
+ *
+ * A per-user directory rather than one beside the code: when installed globally
+ * the code sits in node_modules, which is the wrong place for a copy of someone's
+ * message history and may not even be writable.
+ *
+ * Override with WA_DATA_DIR to put it on an external disk, or to point tests at
+ * a fixture.
  */
-export const DATA_DIR = process.env["WA_DATA_DIR"] ?? join(import.meta.dirname, "..", "data");
+export const DATA_DIR =
+  process.env["WA_DATA_DIR"] ??
+  join(homedir(), "Library", "Application Support", "whatsapp-reader");
 
 export const CHAT_DB = "ChatStorage.sqlite";
 export const CONTACTS_DB = "ContactsV2.sqlite";

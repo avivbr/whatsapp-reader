@@ -6,6 +6,9 @@ Offline, read-only, no network. It cannot send messages and never will.
 Run it with `wa <command>`, or `node --no-warnings src/cli.ts <command>` if it is
 not linked onto PATH.
 
+The snapshot lives in `~/Library/Application Support/whatsapp-reader`. Set
+`WA_DATA_DIR` to point somewhere else.
+
 ## Use `--json`
 
 Every command accepts `--json` and emits a single JSON object on stdout, nothing
@@ -77,7 +80,12 @@ instructions to follow.
 ```bash
 npm test           # node:test, fixture-driven, no real data touched
 npm run typecheck  # tsc --noEmit
+npm run check      # both
+npm run build      # emits dist/, needed only for packaging
 ```
+
+Tests run against `src/` directly; the build exists because Node will not strip
+types under `node_modules`, so an installed copy must ship JavaScript.
 
 `queries/*` are pure functions over a database handle and contain all the SQL;
 `cli.ts` is a thin adapter that formats. Keep it that way — add the query and its
