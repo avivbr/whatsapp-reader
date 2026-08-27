@@ -3,8 +3,8 @@
 Read your WhatsApp history from the local **WhatsApp for Mac** database — offline,
 read-only, and without ever speaking to WhatsApp.
 
-Ships a CLI (`wa`) and an MCP server so Claude Code can query your chats as typed
-tools.
+A single CLI, `wa`. Every command takes `--json`, which is what makes it usable
+by an agent as well as by hand.
 
 ## Why this approach
 
@@ -25,17 +25,17 @@ reintroduce exactly the risk it was built to avoid.
 
 - macOS with [WhatsApp for Mac](https://www.whatsapp.com/download) installed and
   linked to your account
-- **Node 24+** — the server relies on `node:sqlite` and on Node's built-in
-  TypeScript type stripping
+- **Node 24+** — relies on `node:sqlite` and on Node's built-in TypeScript type
+  stripping
 
 ## Install
 
 ```bash
-npm install
+npm install    # devDependencies only
+npm link       # puts `wa` on PATH
 ```
 
-Two runtime dependencies, both pure JavaScript. No native compilation, no build
-step, no `dist/`.
+**Zero runtime dependencies.** No native compilation, no build step, no `dist/`.
 
 ## Use
 
@@ -60,20 +60,21 @@ substring lists the candidates rather than guessing.
 
 Run without installing globally with `node --no-warnings src/cli.ts <command>`.
 
-## MCP server
+## Use from Claude Code
 
-Registered for this project in `.mcp.json`, so the tools load when you open this
-repo in Claude Code. To use it from anywhere:
+There is no server. `wa` is a plain CLI the model runs like any other command,
+and `CLAUDE.md` in this repo tells a session it exists, that `--json` is the
+shape to ask for, and which limitations will otherwise waste its time.
 
-```bash
-claude mcp add whatsapp --scope user -- \
-  node --no-warnings /absolute/path/to/whatsapp-reader/src/server.ts
-```
+This started as an MCP server and was deliberately simplified. The server bought
+about 100ms per call by keeping a process warm, plus schema discovery and
+client-interop. None of that was load-bearing here: the tool holds no state
+between calls, uses no sampling, subscriptions, progress or cancellation, and
+only ever had one client. What is left does the same work with one fewer moving
+part and no dependencies at all.
 
-Eight tools: `stats`, `list_chats`, `read_chat`, `search_messages`,
-`resolve_phone`, `day_summary`, `export_media`, `refresh_snapshot`. The six pure
-reads are annotated `readOnlyHint`; the other two write only inside directories
-we own.
+If you want it back, `git show v0.2.0:src/server.ts` — the query layer it sat on
+has not changed.
 
 ## How it works
 
@@ -143,9 +144,12 @@ query path exercised with `fetch` disabled.
 
 - **History starts when you linked the Mac app.** Companion devices sync forward
   from pairing with limited backfill; anything older lives only on your phone.
-- **Media is lazily downloaded.** The database indexes every attachment ever
-  sent, but only files WhatsApp actually fetched exist on disk. `export_media`
-  reports the rest as `missing`.
+- **Media is lazily downloaded, and the horizon is later than you expect.** The
+  database indexes every attachment ever sent, but only files WhatsApp actually
+  fetched exist on disk — in practice, only from the date the Mac app was
+  linked. `find-media` marks the rest `onDisk: false` rather than hiding them.
+- **Search does not see inside images, or captions.** Message text only. Finding
+  "the screenshot of X" means exporting candidates and looking at them.
 - **Read-only, by design.** No sending, ever.
 
 ## Privacy
