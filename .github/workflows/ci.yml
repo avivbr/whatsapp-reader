@@ -7,14 +7,19 @@ on:
 
 jobs:
   check:
-    # Tests run entirely against synthetic fixtures, so they need no WhatsApp
-    # install and no macOS runner. Only `wa snapshot` touches the real container.
-    runs-on: ubuntu-latest
+    # macOS, not Linux: package.json declares os: darwin, so `npm ci` on Linux
+    # fails with EBADPLATFORM before it can install anything. Matching the only
+    # platform this tool runs on is also the more meaningful test.
+    runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
+          cache: npm
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      # The build is what a consumer actually receives, so prove it emits and runs.
+      - run: npm run build
+      - run: node dist/cli.js --help
