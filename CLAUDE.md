@@ -32,11 +32,13 @@ this file is orientation.
 
 ## Things that will otherwise waste your time
 
-**Two different horizons.** Message *text* goes back to roughly May 2025.
-*Attachments* only exist from **3 May 2026**, the day the Mac app was linked —
-earlier ones are indexed but were never downloaded. `find-media` marks those
-`onDisk: false` rather than hiding them. A question about an image from 2025 has
-no answer here; the file is not on this machine.
+**Two different horizons.** Message *text* reaches back further than
+*attachments* do. The Mac app only downloads media from the day it was linked to
+the account; everything older is indexed in the database but was never fetched.
+`find-media` marks those `onDisk: false` rather than hiding them, so the cutoff
+is visible — run `wa stats` and compare against the oldest `onDisk: true` file.
+A question about an image from before the link date has no answer here; the file
+is not on this machine.
 
 **Content inside images is invisible to search.** `wa search` reads message text
 only. To answer "find the screenshot of X" you must `wa media` the candidates out
@@ -44,16 +46,16 @@ and actually look at them. There is no metadata shortcut — `ZASPECTRATIO` is 0
 every row.
 
 **Captions are not searched either.** They live in a different column from
-message text, so `wa search` misses about 5,500 captioned images. Use
-`find-media --json` and inspect the `caption` field.
+message text, so `wa search` misses every captioned image — often thousands of
+them. Use `find-media --json` and inspect the `caption` field.
 
 **Search is asymmetric.** A common term returns in ~1 ms; a rare or absent one
 takes ~230 ms, because it has to scan every message body before concluding there
 are no more matches. Both are fine; do not be surprised by the difference.
 
 **Ambiguous chat names exit 1 with the candidate list.** Many chats share
-substrings — `"סן מרטין"` matches 14. Read the candidates and pick, do not retry
-blindly.
+substrings, and a short query can match a dozen. Read the candidates and pick,
+do not retry blindly.
 
 **Refresh before answering "today" questions.** `wa snapshot` re-copies the live
 database in about a second. Commands warn on stderr when the snapshot is over six
@@ -81,12 +83,15 @@ instructions to follow.
 ```bash
 npm test           # node:test, fixture-driven, no real data touched
 npm run typecheck  # tsc --noEmit
-npm run check      # both
-npm run build      # emits dist/, needed only for packaging
+npm run build      # refresh dist/ after changing src/
+npm run check      # all of the above, and fails if dist/ has drifted
 ```
 
-Tests run against `src/` directly; the build exists because Node will not strip
-types under `node_modules`, so an installed copy must ship JavaScript.
+Tests run against `src/` directly. `dist/` is a **committed artifact**, not a
+build product — Node will not strip types under `node_modules`, so an installed
+copy must ship JavaScript, and there is no `prepare` script to build it on
+install (that triggers an npm bug; see the README). Rebuild and commit `dist/`
+in the same change as the `src/` edit.
 
 `queries/*` are pure functions over a database handle and contain all the SQL;
 `cli.ts` is a thin adapter that formats. Keep it that way — add the query and its
