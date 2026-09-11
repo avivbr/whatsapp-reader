@@ -975,10 +975,10 @@
       <li><code>node --test</code> green, including every sender-resolution branch and both trap regressions.</li>
       <li><code>tsc --noEmit</code> clean.</li>
       <li><code>wa snapshot &amp;&amp; wa stats</code> → 165k+ messages, newest timestamp within the minute.</li>
-      <li><code>wa read "The bronshteins"</code> → real names, Hebrew intact.</li>
+      <li><code>wa read "&lt;a group chat&gt;"</code> → contact names resolved, Hebrew intact.</li>
       <li>All 8 tools callable from a fresh Claude Code session, returning structured results.</li>
       <li>Offline guarantees hold: no network-capable imports, no WhatsApp endpoints, query path exercised with sockets stubbed.</li>
-      <li><strong>Regression:</strong> <code>resolve_phone</code> over the 161 building numbers reproduces 156/161, including <code>[redacted]</code> → דירה 37 and <code>[redacted]</code> → דירה 35.</li>
+      <li><strong>Regression:</strong> <code>resolve_phone</code> over a held-out set of 161 known numbers reproduces the same 156 names as the hand-checked ground truth, including the two the source spreadsheet had wrong.</li>
     </ul>
   </div>
 </section>

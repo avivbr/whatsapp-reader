@@ -1,6 +1,7 @@
 # whatsapp-reader
 
-`wa` reads Aviv's WhatsApp history from the local WhatsApp for Mac database.
+`wa` reads the signed-in user's WhatsApp history from the local WhatsApp for Mac
+database.
 Offline, read-only, no network. It cannot send messages and never will.
 
 Run it with `wa <command>`, or `node --no-warnings src/cli.ts <command>` if it is
@@ -61,7 +62,7 @@ hours old.
 ## Useful shapes
 
 Finding a person's details usually means anchoring on the *question* rather than
-the answer — searching for "חשבון בנק" finds Aviv asking, and the details are in
+the answer — searching for "חשבון בנק" finds the user asking, and the details are in
 the replies a few messages later, which contain no searchable keyword at all. So:
 search for the anchor, then `wa read --since/--until` around it.
 

@@ -39,7 +39,7 @@ npm install -g github:avivbr/whatsapp-reader
 Or from a checkout, for development:
 
 ```bash
-git clone git@github.com:avivbr/whatsapp-reader.git
+git clone https://github.com/avivbr/whatsapp-reader.git
 cd whatsapp-reader
 npm install
 npm link          # puts `wa` on PATH, running straight from source
