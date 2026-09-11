@@ -20,6 +20,17 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
-      # The build is what a consumer actually receives, so prove it emits and runs.
+      # dist/ is a committed artifact, not a build product: `npm i -g <tarball>`
+      # and `npm link` both run it straight from the repo. A stale dist/ would
+      # ship old behaviour silently, so rebuild and fail on any drift.
       - run: npm run build
+      - name: dist/ must match src/
+        run: git diff --exit-code -- dist
       - run: node dist/cli.js --help
+
+      # Prove the documented install actually works, from a clean prefix.
+      - name: install from a tarball the way a user would
+        run: |
+          npm pack --pack-destination "$RUNNER_TEMP"
+          npm_config_prefix="$RUNNER_TEMP/prefix" npm install -g "$RUNNER_TEMP"/whatsapp-reader-*.tgz
+          "$RUNNER_TEMP/prefix/bin/wa" --help > /dev/null

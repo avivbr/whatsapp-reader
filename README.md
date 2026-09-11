@@ -30,28 +30,43 @@ reintroduce exactly the risk it was built to avoid.
 
 ## Install
 
-Install it as a tool:
+Either way you need a clone or a release tarball — see the note below on why
+`npm i -g github:...` is not offered.
+
+**From a release tarball** (one command, nothing left on disk):
 
 ```bash
-npm install -g github:avivbr/whatsapp-reader
+curl -LO https://github.com/avivbr/whatsapp-reader/releases/latest/download/whatsapp-reader.tgz
+npm install -g ./whatsapp-reader.tgz
 ```
 
-Or from a checkout, for development:
+**From a clone** (also what you want for development):
 
 ```bash
 git clone https://github.com/avivbr/whatsapp-reader.git
 cd whatsapp-reader
 npm install
-npm link          # puts `wa` on PATH, running straight from source
+npm link          # puts `wa` on PATH
 ```
+
+> **Why not `npm install -g github:avivbr/whatsapp-reader`?**
+> It reports success and installs nothing. npm 11.6.2 links a *globally*
+> installed git dependency to a directory under `~/.npm/_cacache/tmp/`, then
+> cleans that directory up — leaving `wa` as a dangling symlink. Installing the
+> same git URL *locally* (without `-g`) works fine, which is what makes the
+> failure so quiet. Use one of the two commands above instead.
 
 **Zero runtime dependencies.** Nothing to compile, no native modules.
 
-There is no build step during development — Node 24 runs the TypeScript directly,
-so tests and `npm link` work against `src/`. Packaging does need one, because Node
-refuses to strip types under `node_modules`, so an installed copy has to ship
-JavaScript. `npm run build` emits `dist/` and `prepare` runs it on install, so it
-is invisible unless you are editing the build itself.
+Tests run against `src/` directly — Node 24 executes the TypeScript without a
+build. An *installed* copy has to ship JavaScript, though, because Node refuses to
+strip types under `node_modules`, so `dist/` is a committed artifact rather than
+something built on install. Run `npm run build` after changing `src/`; `npm run
+check` fails if `dist/` has drifted.
+
+There is deliberately no `prepare` script. Its presence is what triggered the npm
+bug described under Install, and with `dist/` committed there is nothing for it to
+do.
 
 The build uses Node's own `stripTypeScriptTypes` rather than `tsc`, so it needs
 nothing installed — npm does not reliably give `prepare` access to
