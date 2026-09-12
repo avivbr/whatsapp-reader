@@ -56,6 +56,20 @@ npm link          # puts `wa` on PATH
 > same git URL *locally* (without `-g`) works fine, which is what makes the
 > failure so quiet. Use one of the two commands above instead.
 
+## Using it from an AI agent
+
+The CLI is the interface — there is no server to run. Point your agent at it and
+it will use `wa` like any other command.
+
+- **Claude Code** reads `CLAUDE.md` from the project directory.
+- **Codex** reads `AGENTS.md`. Copy this repo's `AGENTS.md` to `~/.codex/AGENTS.md`
+  to make `wa` available from any directory, rewording it in the first person.
+
+Queries work under a read-only sandbox: every connection keeps SQLite's scratch
+space in memory, so no write access is needed to run a `GROUP BY`. `wa snapshot`
+is the exception — it writes outside the workspace and has to be run by you, not
+by the agent. Refresh it before asking about recent messages.
+
 **Zero runtime dependencies.** Nothing to compile, no native modules.
 
 Tests run against `src/` directly — Node 24 executes the TypeScript without a
