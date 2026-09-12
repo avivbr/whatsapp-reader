@@ -25,6 +25,26 @@ after(() => {
 
 const senders = (chat: string, opts = {}) => readChat(db, chat, opts).messages.map((m) => m.sender);
 
+describe("sandbox safety", () => {
+  // Agents commonly run this inside a sandbox that allows reads but denies every
+  // write. SQLite would then try to spill a GROUP BY to a temp file and fail with
+  // a bare "disk I/O error", so the connection must keep scratch space in memory.
+
+  it("keeps temp storage in memory, so a read-only sandbox can query", () => {
+    const mode = db.prepare("PRAGMA temp_store").get() as Record<string, unknown>;
+    // 2 == MEMORY. 0 (default) or 1 (FILE) would touch the filesystem.
+    assert.equal(Number(mode["temp_store"]), 2);
+  });
+
+  it("groups without touching the filesystem", () => {
+    // The query shape that actually broke: aggregate over a computed column.
+    const rows = db
+      .prepare("SELECT ZMESSAGETYPE k, COUNT(*) n FROM ZWAMESSAGE GROUP BY k ORDER BY n DESC")
+      .all();
+    assert.ok(rows.length > 0);
+  });
+});
+
 describe("sender resolution", () => {
   // The fallback chain is the fiddliest part of the reader; cover every branch.
 

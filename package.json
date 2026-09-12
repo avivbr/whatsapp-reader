@@ -27,7 +27,8 @@
     "build": "node --no-warnings scripts/build.mjs",
     "test": "node --no-warnings --test \"test/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm test && npm run build && git diff --quiet dist || (echo 'dist/ is stale - commit the rebuild' && exit 1)"
+    "check": "npm run typecheck && npm test && npm run build && npm run dist:verify",
+    "dist:verify": "git diff --quiet -- dist || (echo 'dist/ is stale - run npm run build and commit dist/' && exit 1)"
   },
   "dependencies": {},
   "devDependencies": {

@@ -101,6 +101,13 @@ export function openSnapshot(dataDir         = DATA_DIR)               {
 
   const db = new DatabaseSync(chat, { readOnly: true });
 
+  // Keep sort and GROUP BY scratch space in memory rather than in a temp file.
+  // Agents often run this inside a sandbox that permits reads but no writes at
+  // all (Codex's read-only mode, for one), and there any query needing a temp
+  // B-tree — `stats` groups 166k rows by year — fails with a bare
+  // "disk I/O error" that points nowhere near the real cause.
+  db.exec("PRAGMA temp_store = MEMORY");
+
   // Attach as empty in-memory stands-ins when absent, so the sender-resolution
   // joins stay valid rather than failing the whole query.
   const contacts = join(dataDir, CONTACTS_DB);
