@@ -12,7 +12,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
@@ -63,6 +63,19 @@ before(() => {
 after(() => {
   rmSync(dataDir, { recursive: true, force: true });
   rmSync(mediaRoot, { recursive: true, force: true });
+});
+
+describe("the shipped binary", () => {
+  // dist/ is committed, so git records its mode. A rebuild that drops the exec
+  // bit ships a `wa` that dies with "permission denied" before Node ever runs.
+  it("is executable, and runs without an interpreter", () => {
+    const bin = join(import.meta.dirname, "..", "dist", "cli.js");
+    if (!existsSync(bin)) return; // built artifact absent; `npm run build` covers it
+    assert.ok(statSync(bin).mode & 0o111, "dist/cli.js must be executable");
+    const r = spawnSync(bin, ["--help"], { encoding: "utf8" });
+    assert.equal(r.status, 0, `direct exec failed: ${r.error?.message ?? r.stderr}`);
+    assert.match(r.stdout, /COMMANDS/);
+  });
 });
 
 describe("discovery", () => {

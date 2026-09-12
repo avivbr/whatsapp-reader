@@ -2,16 +2,15 @@
 /**
  * Emit dist/ from src/ using only Node built-ins.
  *
- * Why not tsc: `prepare` runs during `npm install`, and npm does not reliably
- * provide devDependencies to it — a git install fails with "tsc: command not
- * found". Node can strip types itself, so the build needs nothing installed and
- * works wherever the package is being installed from.
+ * Why not tsc: this has to run wherever the package is built, including places
+ * that have no devDependencies installed. Node can strip types itself, so the
+ * build needs nothing beyond Node.
  *
  * tsc is still the typechecker (`npm run typecheck`). This script only erases
  * types; it validates nothing, which is fine because CI typechecks separately.
  */
 
-import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { stripTypeScriptTypes } from "node:module";
 import { dirname, join, relative } from "node:path";
 
@@ -27,6 +26,12 @@ function sources(dir) {
 }
 
 rmSync(OUT, { recursive: true, force: true });
+
+// Whatever package.json exposes as a bin must end up executable.
+const BIN_FILES = new Set(
+  Object.values(JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).bin)
+    .map((p) => p.replace(/^\.\/dist\//, "").replace(/\.js$/, ".ts")),
+);
 
 let count = 0;
 for (const file of sources(SRC)) {
@@ -53,6 +58,12 @@ for (const file of sources(SRC)) {
   const target = join(OUT, relative(SRC, file)).replace(/\.ts$/, ".js");
   mkdirSync(dirname(target), { recursive: true });
   writeFileSync(target, rewritten);
+
+  // The bin entry has to be executable. npm sets this during an install, but a
+  // plain rebuild does not -- and since dist/ is committed, git records the mode,
+  // so a 644 here ships a `wa` that dies with "permission denied".
+  if (BIN_FILES.has(relative(SRC, file))) chmodSync(target, 0o755);
+
   count += 1;
 }
 
